@@ -572,12 +572,19 @@ func CreateAgentVMSS(cs *api.ContainerService, profile *api.AgentPoolProfile) Vi
 	vmssStorageProfile := compute.VirtualMachineScaleSetStorageProfile{}
 
 	if profile.IsWindows() {
-		vmssStorageProfile.ImageReference = &compute.ImageReference{
-			Offer:     to.StringPtr("[parameters('agentWindowsOffer')]"),
-			Publisher: to.StringPtr("[parameters('agentWindowsPublisher')]"),
-			Sku:       to.StringPtr("[parameters('agentWindowsSku')]"),
-			Version:   to.StringPtr("[parameters('agentWindowsVersion')]"),
+		if profile.HasImageRef() {
+			vmssStorageProfile.ImageReference = &compute.ImageReference{
+				ID: to.StringPtr(fmt.Sprintf("[resourceId(variables('%[1]sosImageResourceGroup'), 'Microsoft.Compute/images', variables('%[1]sosImageName'))]", profile.Name)),
+			}
+		} else {
+			vmssStorageProfile.ImageReference = &compute.ImageReference{
+				Offer:     to.StringPtr("[parameters('agentWindowsOffer')]"),
+				Publisher: to.StringPtr("[parameters('agentWindowsPublisher')]"),
+				Sku:       to.StringPtr("[parameters('agentWindowsSku')]"),
+				Version:   to.StringPtr("[parameters('agentWindowsVersion')]"),
+			}
 		}
+
 		vmssStorageProfile.DataDisks = getVMSSDataDisks(profile)
 	} else {
 		if profile.HasImageRef() {
