@@ -485,6 +485,13 @@ type MasterProfile struct {
 	CosmosEtcd *bool `json:"cosmosEtcd,omitempty"`
 }
 
+// Image represents information used to specify images used for master and node pools.
+type Image struct {
+	ImageURL          string `json:"imageUrl,omitEmpty"`
+	ImageRef         *ImageReference `json:imageReference,omitEmpty"`
+	MarketplaceImage *MarketplaceImage `json:marketplaceImage,omitEmpty`
+}
+
 // ImageReference represents a reference to an Image resource in Azure.
 type ImageReference struct {
 	Name           string `json:"name,omitempty"`
@@ -492,6 +499,14 @@ type ImageReference struct {
 	SubscriptionID string `json:"subscriptionId,omitempty"`
 	Gallery        string `json:"gallery,omitempty"`
 	Version        string `json:"version,omitempty"`
+}
+
+// MarketplaceImage represents fields needed to identify an Azure marketplace image.
+type MarketplaceImage struct {
+	Publisher string `json:"publisher,omitempty"`
+	Offer     string `json:"offer,omitempty"`
+	Sku       string `json:"sku,omitempty"`
+	Version   string `json:"version,omitempty"`
 }
 
 // ExtensionProfile represents an extension definition
@@ -543,7 +558,8 @@ type AgentPoolProfile struct {
 	Extensions                          []Extension          `json:"extensions"`
 	KubernetesConfig                    *KubernetesConfig    `json:"kubernetesConfig,omitempty"`
 	OrchestratorVersion                 string               `json:"orchestratorVersion"`
-	ImageRef                            *ImageReference      `json:"imageReference,omitempty"`
+	Image                               *Image               `json:"image,omitempty"`
+	ImageRef                            *ImageReference      `json:"imageReference,omitempty`   // TODO: remove
 	MaxCount                            *int                 `json:"maxCount,omitempty"`
 	MinCount                            *int                 `json:"minCount,omitempty"`
 	EnableAutoScaling                   *bool                `json:"enableAutoScaling,omitempty"`
@@ -1326,6 +1342,12 @@ func (m *MasterProfile) GetCosmosEndPointURI() string {
 	return ""
 }
 
+// HasImage returns true if customer brought image os image is specified
+func (a *AgentPoolProfile) HasImage() bool {
+	i := a.Image
+	return (i != nil) && (i.HasImageURL() || i.HasImageReference() || i.HasGalleryImage() || i.HasMarketplaceImage())
+}
+
 // HasImageRef returns true if the customer brought os image
 func (a *AgentPoolProfile) HasImageRef() bool {
 	imageRef := a.ImageRef
@@ -1903,6 +1925,29 @@ func (cs *ContainerService) SetPlatformFaultDomainCount(count int) {
 	for _, pool := range cs.Properties.AgentPoolProfiles {
 		pool.PlatformFaultDomainCount = &count
 	}
+}
+
+// HasImageURL returns true if Image specifies a image by Url
+func (i *Image) HasImageURL() bool {
+	return len(i.ImageURL) > 0
+}
+
+// HasImageReference returns true if Image specifies a managed image
+func (i *Image) HasImageReference() bool {
+	imageRef := i.ImageRef
+	return imageRef != nil && len(imageRef.Name) > 0 && len(imageRef.ResourceGroup) > 0
+}
+
+// HasGalleryImage returns true if Image specifies a gallary image
+func (i *Image) HasGalleryImage() bool {
+	imageRef := i.ImageRef
+	return imageRef != nil && i.HasImageReference() && len(imageRef.SubscriptionID) > 0 && len(imageRef.Gallery) > 0 && len(imageRef.Version) > 0
+}
+
+// HasMarketplaceImage returns true if Image specifies a marketplace image
+func (i *Image ) HasMarketplaceImage() bool {
+	m := i.MarketplaceImage
+	return m != nil && len(m.Publisher) > 0 && len(m.Offer) > 0 && len(m.Sku) > 0 && len(m.Version) > 0
 }
 
 // FormatAzureProdFQDNByLocation constructs an Azure prod fqdn
