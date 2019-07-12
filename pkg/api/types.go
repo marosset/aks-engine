@@ -487,8 +487,8 @@ type MasterProfile struct {
 
 // Image represents information used to specify images used for master and node pools.
 type Image struct {
-	ImageURL          string `json:"imageUrl,omitEmpty"`
-	ImageRef         *ImageReference `json:imageReference,omitEmpty"`
+	ImageURL         string            `json:"imageUrl,omitEmpty"`
+	ImageRef         *ImageReference   `json:imageReference,omitEmpty"`
 	MarketplaceImage *MarketplaceImage `json:marketplaceImage,omitEmpty`
 }
 
@@ -559,7 +559,7 @@ type AgentPoolProfile struct {
 	KubernetesConfig                    *KubernetesConfig    `json:"kubernetesConfig,omitempty"`
 	OrchestratorVersion                 string               `json:"orchestratorVersion"`
 	Image                               *Image               `json:"image,omitempty"`
-	ImageRef                            *ImageReference      `json:"imageReference,omitempty`   // TODO: remove
+	ImageRef                            *ImageReference      `json:"imageReference,omitempty` // TODO: remove
 	MaxCount                            *int                 `json:"maxCount,omitempty"`
 	MinCount                            *int                 `json:"minCount,omitempty"`
 	EnableAutoScaling                   *bool                `json:"enableAutoScaling,omitempty"`
@@ -1945,7 +1945,7 @@ func (i *Image) HasGalleryImage() bool {
 }
 
 // HasMarketplaceImage returns true if Image specifies a marketplace image
-func (i *Image ) HasMarketplaceImage() bool {
+func (i *Image) HasMarketplaceImage() bool {
 	m := i.MarketplaceImage
 	return m != nil && len(m.Publisher) > 0 && len(m.Offer) > 0 && len(m.Sku) > 0 && len(m.Version) > 0
 }
