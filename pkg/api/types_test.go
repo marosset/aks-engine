@@ -1129,6 +1129,196 @@ func TestPropertiesAgentCustomOS(t *testing.T) {
 	}
 }
 
+func TestPropertiesAgentCustomImage(t *testing.T) {
+	cases := []struct {
+		name                string
+		p                   Properties
+		expectedHasImage    bool
+		expectedURL         bool
+		expectedRef         bool
+		expectedGallery     bool
+		expectedMarketplace bool
+	}{
+		{
+			name: "valid - no custom image",
+			p: Properties{
+				AgentPoolProfiles: []*AgentPoolProfile{
+					{
+						Image: nil,
+					},
+				},
+			},
+			expectedHasImage:    false,
+			expectedURL:         false,
+			expectedRef:         false,
+			expectedGallery:     false,
+			expectedMarketplace: false,
+		},
+		{
+			name: "valid - custom image - URL",
+			p: Properties{
+				AgentPoolProfiles: []*AgentPoolProfile{
+					{
+						Image: &Image{
+							ImageURL: "http://some/image.vhd",
+						},
+					},
+				},
+			},
+			expectedHasImage:    true,
+			expectedURL:         true,
+			expectedRef:         false,
+			expectedGallery:     false,
+			expectedMarketplace: false,
+		},
+		{
+			name: "valid - custom image - reference",
+			p: Properties{
+				AgentPoolProfiles: []*AgentPoolProfile{
+					{
+						Image: &Image{
+							ImageRef: &ImageReference{
+								Name:          "ImageName",
+								ResourceGroup: "ResourceGroup",
+							},
+						},
+					},
+				},
+			},
+			expectedHasImage:    true,
+			expectedURL:         false,
+			expectedRef:         true,
+			expectedGallery:     false,
+			expectedMarketplace: false,
+		},
+		{
+			name: "valid - custom image - gallery image",
+			p: Properties{
+				AgentPoolProfiles: []*AgentPoolProfile{
+					{
+						Image: &Image{
+							ImageRef: &ImageReference{
+								Name:           "ImageName",
+								ResourceGroup:  "ResourceGroup",
+								SubscriptionID: "SubscriptionId",
+								Gallery:        "Gallery",
+								Version:        "Version",
+							},
+						},
+					},
+				},
+			},
+			expectedHasImage:    true,
+			expectedURL:         false,
+			expectedRef:         true,
+			expectedGallery:     true,
+			expectedMarketplace: false,
+		},
+		{
+			name: "valid - custom image - marketplaceimage",
+			p: Properties{
+				AgentPoolProfiles: []*AgentPoolProfile{
+					{
+						Image: &Image{
+							MarketplaceImage: &MarketplaceImage{
+								Publisher: "Publisher",
+								Offer:     "Offer",
+								Sku:       "Sku",
+								Version:   "Version",
+							},
+						},
+					},
+				},
+			},
+			expectedHasImage:    true,
+			expectedURL:         false,
+			expectedRef:         false,
+			expectedGallery:     false,
+			expectedMarketplace: true,
+		},
+		{
+			name: "invalid - custom image - reference",
+			p: Properties{
+				AgentPoolProfiles: []*AgentPoolProfile{
+					{
+						Image: &Image{
+							ImageRef: &ImageReference{
+								Name:          "ImageName",
+								ResourceGroup: "",
+							},
+						},
+					},
+				},
+			},
+			expectedHasImage:    false,
+			expectedURL:         false,
+			expectedRef:         false,
+			expectedGallery:     false,
+			expectedMarketplace: false,
+		},
+		{
+			name: "invalid - custom image - gallery image",
+			p: Properties{
+				AgentPoolProfiles: []*AgentPoolProfile{
+					{
+						Image: &Image{
+							ImageRef: &ImageReference{
+								Name:           "ImageName",
+								ResourceGroup:  "ResourceGroup",
+								SubscriptionID: "",
+								Gallery:        "Gallery",
+								Version:        "",
+							},
+						},
+					},
+				},
+			},
+			expectedHasImage:    true,
+			expectedURL:         false,
+			expectedRef:         true,
+			expectedGallery:     false,
+			expectedMarketplace: false,
+		},
+		{
+			name: "invalid - custom image - marketplaceimage",
+			p: Properties{
+				AgentPoolProfiles: []*AgentPoolProfile{
+					{
+						Image: &Image{
+							MarketplaceImage: &MarketplaceImage{
+								Publisher: "",
+								Offer:     "Offer",
+								Sku:       "",
+								Version:   "Version",
+							},
+						},
+					},
+				},
+			},
+			expectedHasImage:    false,
+			expectedURL:         false,
+			expectedRef:         false,
+			expectedGallery:     false,
+			expectedMarketplace: false,
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			p := c.p.AgentPoolProfiles[0]
+			if p.HasImage() != c.expectedHasImage {
+				t.Fatalf("expected HasImage() to return %t but instead returned %t", c.expectedHasImage, p.HasImage())
+				t.Fatalf("expected HasImageURL() to return %t but instead retured %t", c.expectedURL, p.Image.HasImageURL())
+				t.Fatalf("expected HasImageReference() to return %t but instead returned %t", c.expectedRef, p.Image.HasImageReference())
+				t.Fatalf("expected HasGalleryImage() to return %t but instead returned %t", c.expectedGallery, p.Image.HasGalleryImage())
+				t.Fatalf("expected HasMarketplaceImage() to returun %t but instead returned %t", c.expectedMarketplace, p.Image.HasMarketplaceImage())
+			}
+		})
+	}
+}
+
 func TestMasterAvailabilityProfile(t *testing.T) {
 	cases := []struct {
 		name           string
