@@ -488,8 +488,8 @@ type MasterProfile struct {
 // Image represents information used to specify images used for master and node pools.
 type Image struct {
 	ImageURL         string            `json:"imageUrl,omitEmpty"`
-	ImageRef         *ImageReference   `json:imageReference,omitEmpty"`
-	MarketplaceImage *MarketplaceImage `json:marketplaceImage,omitEmpty`
+	ImageRef         *ImageReference   `json:"imageReference,omitEmpty"`
+	MarketplaceImage *MarketplaceImage `json:"marketplaceImage,omitEmpty"`
 }
 
 // ImageReference represents a reference to an Image resource in Azure.

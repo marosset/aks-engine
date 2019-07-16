@@ -306,6 +306,13 @@ var _agentparamsT = []byte(`    "{{.Name}}Count": {
       "type": "array"
     },
 {{end}}
+    "{{.Name}}osImageSourceUrl": {
+      "defaultValue": "",
+      "metadata": {
+        "description": "The source of the generalized blob which will be used to create a custom image for the agent virtual machines."
+      },
+      "type": "string"
+    },
     "{{.Name}}osImageName": {
       "defaultValue": "",
       "metadata": {
@@ -27047,13 +27054,6 @@ var _windowsparamsT = []byte(` {{if IsKubernetes}}
       "defaultValue": "latest",
       "metadata": {
         "description": "Version of the Windows Server OS image to use for the agent virtual machines."
-      },
-      "type": "string"
-    },
-    "agentWindowsSourceUrl": {
-      "defaultValue": "",
-      "metadata": {
-        "description": "The source of the generalized blob which will be used to create a custom windows image for the agent virtual machines."
       },
       "type": "string"
     },

@@ -11,20 +11,26 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 )
 
-func createWindowsImage(profile *api.AgentPoolProfile) ImageARM {
+// Creates an ARM resource for a vhd located at specified URL
+func createImageFromURL(profile *api.AgentPoolProfile) ImageARM {
+	osType := compute.Linux
+	if profile.IsWindows() {
+		osType = compute.Windows
+	}
+
 	return ImageARM{
 		ARMResource: ARMResource{
 			APIVersion: "[variables('apiVersionCompute')]",
 		},
 		Image: compute.Image{
 			Type: to.StringPtr("Microsoft.Compute/images"),
-			Name: to.StringPtr(fmt.Sprintf("%sCustomWindowsImage", profile.Name)),
+			Name: to.StringPtr(fmt.Sprintf("%sosCustomImage", profile.Name)),
 			ImageProperties: &compute.ImageProperties{
 				StorageProfile: &compute.ImageStorageProfile{
 					OsDisk: &compute.ImageOSDisk{
-						OsType:             "Windows",
+						OsType:             osType,
 						OsState:            compute.Generalized,
-						BlobURI:            to.StringPtr("[parameters('agentWindowsSourceUrl')]"),
+						BlobURI:            to.StringPtr(fmt.Sprintf("[parameters('%sosImageSourceUrl')]", profile.Name)),
 						StorageAccountType: compute.StorageAccountTypesStandardLRS,
 					},
 				},

@@ -200,6 +200,9 @@ func getParameters(cs *api.ContainerService, generatorCode string, aksEngineVers
 		if len(agentProfile.Ports) > 0 {
 			addValue(parametersMap, fmt.Sprintf("%sEndpointDNSNamePrefix", agentProfile.Name), agentProfile.DNSPrefix)
 		}
+		if agentProfile.HasImage() && agentProfile.Image.HasImageURL() {
+			addValue(parametersMap, fmt.Sprintf("%sosImageSourceUrl", agentProfile.Name), agentProfile.Image.ImageURL)
+		}
 
 		// Unless distro is defined, default distro is configured by defaults#setAgentProfileDefaults
 		//   Ignores Windows OS
@@ -221,9 +224,6 @@ func getParameters(cs *api.ContainerService, generatorCode string, aksEngineVers
 		addSecret(parametersMap, "windowsAdminPassword", properties.WindowsProfile.AdminPassword, false)
 		if properties.WindowsProfile.ImageVersion != "" {
 			addValue(parametersMap, "agentWindowsVersion", properties.WindowsProfile.ImageVersion)
-		}
-		if properties.WindowsProfile.WindowsImageSourceURL != "" {
-			addValue(parametersMap, "agentWindowsSourceUrl", properties.WindowsProfile.WindowsImageSourceURL)
 		}
 		if properties.WindowsProfile.WindowsPublisher != "" {
 			addValue(parametersMap, "agentWindowsPublisher", properties.WindowsProfile.WindowsPublisher)

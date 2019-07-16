@@ -56,6 +56,13 @@
       "type": "array"
     },
 {{end}}
+    "{{.Name}}osImageSourceUrl": {
+      "defaultValue": "",
+      "metadata": {
+        "description": "The source of the generalized blob which will be used to create a custom image for the agent virtual machines."
+      },
+      "type": "string"
+    },
     "{{.Name}}osImageName": {
       "defaultValue": "",
       "metadata": {

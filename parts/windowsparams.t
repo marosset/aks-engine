@@ -49,13 +49,6 @@
       },
       "type": "string"
     },
-    "agentWindowsSourceUrl": {
-      "defaultValue": "",
-      "metadata": {
-        "description": "The source of the generalized blob which will be used to create a custom windows image for the agent virtual machines."
-      },
-      "type": "string"
-    },
     "agentWindowsPublisher": {
       "defaultValue": "MicrosoftWindowsServer",
       "metadata": {

@@ -402,6 +402,13 @@ type MasterProfile struct {
 	CosmosEtcd *bool `json:"cosmosEtcd,omitempty"`
 }
 
+// Image represents information used to specify images used for master and node pools.
+type Image struct {
+	ImageURL         string            `json:"imageUrl,omitEmpty"`
+	ImageRef         *ImageReference   `json:"imageReference,omitEmpty"`
+	MarketplaceImage *MarketplaceImage `json:"marketplaceImage,omitEmpty"`
+}
+
 // ImageReference represents a reference to an Image resource in Azure.
 type ImageReference struct {
 	Name           string `json:"name,omitempty"`
@@ -410,6 +417,16 @@ type ImageReference struct {
 	Gallery        string `json:"gallery,omitempty"`
 	Version        string `json:"version,omitempty"`
 }
+
+
+// MarketplaceImage represents fields needed to identify an Azure marketplace image.
+type MarketplaceImage struct {
+	Publisher string `json:"publisher,omitempty"`
+	Offer     string `json:"offer,omitempty"`
+	Sku       string `json:"sku,omitempty"`
+	Version   string `json:"version,omitempty"`
+}
+
 
 // ExtensionProfile represents an extension definition
 type ExtensionProfile struct {
@@ -448,6 +465,7 @@ type AgentPoolProfile struct {
 	IPAddressCount                      int                  `json:"ipAddressCount,omitempty" validate:"min=0,max=256"`
 	Distro                              Distro               `json:"distro,omitempty"`
 	KubernetesConfig                    *KubernetesConfig    `json:"kubernetesConfig,omitempty"`
+	Image                               *Image               `json:"image,omitempty"`
 	ImageRef                            *ImageReference      `json:"imageReference,omitempty"`
 	Role                                AgentPoolProfileRole `json:"role,omitempty"`
 	AcceleratedNetworkingEnabled        *bool                `json:"acceleratedNetworkingEnabled,omitempty"`

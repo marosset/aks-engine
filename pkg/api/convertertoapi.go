@@ -1066,6 +1066,25 @@ func convertVLabsAgentPoolProfile(vlabs *vlabs.AgentPoolProfile, api *AgentPoolP
 		api.KubernetesConfig = &KubernetesConfig{}
 		convertVLabsKubernetesConfig(vlabs.KubernetesConfig, api.KubernetesConfig)
 	}
+	if vlabs.Image != nil {
+		api.Image = &Image{}
+		api.Image.ImageURL = vlabs.Image.ImageURL
+		if vlabs.Image.ImageRef != nil {
+			api.Image.ImageRef = &ImageReference{}
+			api.Image.ImageRef.Name = vlabs.Image.ImageRef.Name
+			api.Image.ImageRef.ResourceGroup = vlabs.Image.ImageRef.ResourceGroup
+			api.Image.ImageRef.SubscriptionID = vlabs.Image.ImageRef.SubscriptionID
+			api.Image.ImageRef.Gallery = vlabs.Image.ImageRef.Gallery
+			api.Image.ImageRef.Version = vlabs.Image.ImageRef.Version
+		}
+		if vlabs.Image.MarketplaceImage != nil {
+			api.Image.MarketplaceImage = &MarketplaceImage{}
+			api.Image.MarketplaceImage.Offer = vlabs.Image.MarketplaceImage.Offer
+			api.Image.MarketplaceImage.Publisher = vlabs.Image.MarketplaceImage.Publisher
+			api.Image.MarketplaceImage.Sku = vlabs.Image.MarketplaceImage.Sku
+			api.Image.MarketplaceImage.Version = vlabs.Image.MarketplaceImage.Version
+		}
+	}
 	if vlabs.ImageRef != nil {
 		api.ImageRef = &ImageReference{}
 		api.ImageRef.Name = vlabs.ImageRef.Name

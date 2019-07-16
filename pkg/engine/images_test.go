@@ -12,36 +12,72 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestCreateWindowsImage(t *testing.T) {
-	profile := &api.AgentPoolProfile{
-		Name: "foobar",
-	}
-
-	actual := createWindowsImage(profile)
-
-	expected := ImageARM{
-		ARMResource: ARMResource{
-			APIVersion: "[variables('apiVersionCompute')]",
-		},
-		Image: compute.Image{
-			Type: to.StringPtr("Microsoft.Compute/images"),
-			Name: to.StringPtr("foobarCustomWindowsImage"),
-			ImageProperties: &compute.ImageProperties{
-				StorageProfile: &compute.ImageStorageProfile{
-					OsDisk: &compute.ImageOSDisk{
-						OsType:             "Windows",
-						OsState:            compute.Generalized,
-						BlobURI:            to.StringPtr("[parameters('agentWindowsSourceUrl')]"),
-						StorageAccountType: compute.StorageAccountTypesStandardLRS,
-					},
+func TestCreateImageFromURL(t *testing.T) {
+	cases := []struct {
+		name            string
+		p               api.AgentPoolProfile
+		expectedName    string
+		expectedOsType  compute.OperatingSystemTypes
+		expectedBlobURI string
+	}{
+		{
+			name: "Linux image from URL",
+			p: api.AgentPoolProfile{
+				Name: "foo",
+				Image: &api.Image{
+					ImageURL: "linuxImageURL",
 				},
 			},
+			expectedName:    "fooosCustomImage",
+			expectedOsType:  compute.Linux,
+			expectedBlobURI: "[parameters('fooosImageSourceUrl')]",
+		},
+		{
+			name: "Windows image from URL",
+			p: api.AgentPoolProfile{
+				Name: "bar",
+				Image: &api.Image{
+					ImageURL: "windowsImageURL",
+				},
+				OSType: "Windows",
+			},
+			expectedName:    "barosCustomImage",
+			expectedOsType:  compute.Windows,
+			expectedBlobURI: "[parameters('barosImageSourceUrl')]",
 		},
 	}
 
-	diff := cmp.Diff(actual, expected)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 
-	if diff != "" {
-		t.Errorf("unexpected diff while comparing windows images: %s", diff)
+			actual := createImageFromURL(&c.p)
+
+			expected := ImageARM{
+				ARMResource: ARMResource{
+					APIVersion: "[variables('apiVersionCompute')]",
+				},
+				Image: compute.Image{
+					Type: to.StringPtr("Microsoft.Compute/images"),
+					Name: to.StringPtr(c.expectedName),
+					ImageProperties: &compute.ImageProperties{
+						StorageProfile: &compute.ImageStorageProfile{
+							OsDisk: &compute.ImageOSDisk{
+								OsType:             c.expectedOsType,
+								OsState:            compute.Generalized,
+								BlobURI:            to.StringPtr(c.expectedBlobURI),
+								StorageAccountType: compute.StorageAccountTypesStandardLRS,
+							},
+						},
+					},
+				},
+			}
+
+			diff := cmp.Diff(actual, expected)
+
+			if diff != "" {
+				t.Errorf("Unexpected diff while comparing image ARM: %s", diff)
+			}
+		})
 	}
 }

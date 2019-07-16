@@ -37,14 +37,17 @@ func GenerateARMResources(cs *api.ContainerService) []interface{} {
 	profiles := cs.Properties.AgentPoolProfiles
 
 	for _, profile := range profiles {
+		if profile.HasImage() && profile.Image.HasImageURL() {
+			armResources = append(armResources, createImageFromURL(profile))
+		}
+
 		if profile.IsVirtualMachineScaleSets() {
 			if useManagedIdentity && !userAssignedIDEnabled {
 				armResources = append(armResources, createAgentVMSSSysRoleAssignment(profile))
 			}
 			armResources = append(armResources, CreateAgentVMSS(cs, profile))
 		} else {
-			agentVMASResources := createKubernetesAgentVMASResources(cs, profile)
-			armResources = append(armResources, agentVMASResources...)
+			armResources = append(armResources, createKubernetesAgentVMASResources(cs, profile))
 		}
 	}
 
@@ -89,12 +92,6 @@ func GenerateARMResources(cs *api.ContainerService) []interface{} {
 
 func createKubernetesAgentVMASResources(cs *api.ContainerService, profile *api.AgentPoolProfile) []interface{} {
 	var agentVMASResources []interface{}
-
-	if profile.IsWindows() {
-		if cs.Properties.WindowsProfile.HasCustomImage() {
-			agentVMASResources = append(agentVMASResources, createWindowsImage(profile))
-		}
-	}
 
 	agentVMASNIC := createAgentVMASNetworkInterface(cs, profile)
 	agentVMASResources = append(agentVMASResources, agentVMASNIC)
