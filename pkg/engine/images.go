@@ -25,6 +25,7 @@ func createImageFromURL(profile *api.AgentPoolProfile) ImageARM {
 		Image: compute.Image{
 			Type: to.StringPtr("Microsoft.Compute/images"),
 			Name: to.StringPtr(fmt.Sprintf("%sosCustomImage", profile.Name)),
+			Location: to.StringPtr("[parameters('location')]"),
 			ImageProperties: &compute.ImageProperties{
 				StorageProfile: &compute.ImageStorageProfile{
 					OsDisk: &compute.ImageOSDisk{

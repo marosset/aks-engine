@@ -200,21 +200,34 @@ func getParameters(cs *api.ContainerService, generatorCode string, aksEngineVers
 		if len(agentProfile.Ports) > 0 {
 			addValue(parametersMap, fmt.Sprintf("%sEndpointDNSNamePrefix", agentProfile.Name), agentProfile.DNSPrefix)
 		}
-		if agentProfile.HasImage() && agentProfile.Image.HasImageURL() {
-			addValue(parametersMap, fmt.Sprintf("%sosImageSourceUrl", agentProfile.Name), agentProfile.Image.ImageURL)
-		}
 
-		// Unless distro is defined, default distro is configured by defaults#setAgentProfileDefaults
-		//   Ignores Windows OS
-		if !(agentProfile.OSType == api.Windows) {
-			if agentProfile.ImageRef != nil {
-				addValue(parametersMap, fmt.Sprintf("%sosImageName", agentProfile.Name), agentProfile.ImageRef.Name)
-				addValue(parametersMap, fmt.Sprintf("%sosImageResourceGroup", agentProfile.Name), agentProfile.ImageRef.ResourceGroup)
+		// Set parameters used for specifing custom images
+		if agentProfile.HasImage() {
+			if agentProfile.Image.HasImageURL() {
+				addValue(parametersMap, fmt.Sprintf("%sosImageSourceUrl", agentProfile.Name), agentProfile.Image.ImageURL)
+			} else if agentProfile.Image.HasImageReference() {
+				addValue(parametersMap, fmt.Sprintf("%sosImageName", agentProfile.Name), agentProfile.Image.ImageRef.Name)
+				addValue(parametersMap, fmt.Sprintf("%sosImageResourceGroup", agentProfile.Name), agentProfile.Image.ImageRef.ResourceGroup)
+				if agentProfile.Image.HasGalleryImage() {
+					//	addValue(parametersMap, fmt.Sprintf("%sosImageGallery", agentProfile.Name), agentProfile.Image.ImageRef.Gallery)
+					//	addValue(parametersMap, fmt.Sprintf("%sosImageSubscriptionId", agentProfile.Name), agentProfile.Image.ImageRef.SubscriptionID)
+					addValue(parametersMap, fmt.Sprintf("%sosImageVersion", agentProfile.Name), agentProfile.Image.ImageRef.Version)
+				}
+			} else if agentProfile.Image.HasMarketplaceImage() {
+				// If imaging options specified for Windows profiles default vaules are set by defaults#setImageDefaultsWindows
+				addValue(parametersMap, fmt.Sprintf("%sosImageOffer", agentProfile.Name), agentProfile.Image.MarketplaceImage.Offer)
+				addValue(parametersMap, fmt.Sprintf("%sosImagePublisher", agentProfile.Name), agentProfile.Image.MarketplaceImage.Publisher)
+				addValue(parametersMap, fmt.Sprintf("%sosImageSKU", agentProfile.Name), agentProfile.Image.MarketplaceImage.Sku)
+				addValue(parametersMap, fmt.Sprintf("%sosImageVersion", agentProfile.Name), agentProfile.Image.MarketplaceImage.Version)
 			}
-			addValue(parametersMap, fmt.Sprintf("%sosImageOffer", agentProfile.Name), cloudSpecConfig.OSImageConfig[agentProfile.Distro].ImageOffer)
-			addValue(parametersMap, fmt.Sprintf("%sosImageSKU", agentProfile.Name), cloudSpecConfig.OSImageConfig[agentProfile.Distro].ImageSku)
-			addValue(parametersMap, fmt.Sprintf("%sosImagePublisher", agentProfile.Name), cloudSpecConfig.OSImageConfig[agentProfile.Distro].ImagePublisher)
-			addValue(parametersMap, fmt.Sprintf("%sosImageVersion", agentProfile.Name), cloudSpecConfig.OSImageConfig[agentProfile.Distro].ImageVersion)
+		} else {
+			if agentProfile.OSType == api.Linux {
+				// For Linux profile images using distro settings - default distro is configured by defaults#setAgentProfileDefaults
+				addValue(parametersMap, fmt.Sprintf("%sosImageOffer", agentProfile.Name), cloudSpecConfig.OSImageConfig[agentProfile.Distro].ImageOffer)
+				addValue(parametersMap, fmt.Sprintf("%sosImageSKU", agentProfile.Name), cloudSpecConfig.OSImageConfig[agentProfile.Distro].ImageSku)
+				addValue(parametersMap, fmt.Sprintf("%sosImagePublisher", agentProfile.Name), cloudSpecConfig.OSImageConfig[agentProfile.Distro].ImagePublisher)
+				addValue(parametersMap, fmt.Sprintf("%sosImageVersion", agentProfile.Name), cloudSpecConfig.OSImageConfig[agentProfile.Distro].ImageVersion)
+			}
 		}
 	}
 
@@ -222,17 +235,7 @@ func getParameters(cs *api.ContainerService, generatorCode string, aksEngineVers
 	if properties.HasWindows() {
 		addValue(parametersMap, "windowsAdminUsername", properties.WindowsProfile.AdminUsername)
 		addSecret(parametersMap, "windowsAdminPassword", properties.WindowsProfile.AdminPassword, false)
-		if properties.WindowsProfile.ImageVersion != "" {
-			addValue(parametersMap, "agentWindowsVersion", properties.WindowsProfile.ImageVersion)
-		}
-		if properties.WindowsProfile.WindowsPublisher != "" {
-			addValue(parametersMap, "agentWindowsPublisher", properties.WindowsProfile.WindowsPublisher)
-		}
-		if properties.WindowsProfile.WindowsOffer != "" {
-			addValue(parametersMap, "agentWindowsOffer", properties.WindowsProfile.WindowsOffer)
-		}
 
-		addValue(parametersMap, "agentWindowsSku", properties.WindowsProfile.GetWindowsSku())
 		addValue(parametersMap, "windowsDockerVersion", properties.WindowsProfile.GetWindowsDockerVersion())
 
 		for i, s := range properties.WindowsProfile.Secrets {

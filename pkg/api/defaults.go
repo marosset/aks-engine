@@ -591,7 +591,7 @@ func (p *Properties) setAgentProfileDefaults(isUpgrade, isScale bool, cloudName 
 			profile.AuditDEnabled = to.BoolPtr(DefaultAuditDEnabled && !isUpgrade && !isScale)
 		}
 
-		if profile.OSType != Windows {
+		if profile.OSType == Linux {
 			if profile.Distro == "" {
 				if p.OrchestratorProfile.IsKubernetes() {
 					if profile.OSDiskSizeGB != 0 && profile.OSDiskSizeGB < VHDDiskSizeAKS {
@@ -616,6 +616,8 @@ func (p *Properties) setAgentProfileDefaults(isUpgrade, isScale bool, cloudName 
 			if cloudName == AzureUSGovernmentCloud || cloudName == AzureGermanCloud {
 				profile.Distro = Ubuntu
 			}
+		} else if profile.OSType == Windows {
+			profile.setImageDefaultsWindows(isUpgrade, isScale, p.IsAzureStackCloud())
 		}
 
 		// "--protect-kernel-defaults" is only true for VHD based VMs since the base Ubuntu distros don't have a /etc/sysctl.d/60-CIS.conf file.
@@ -659,6 +661,38 @@ func (p *Properties) setAgentProfileDefaults(isUpgrade, isScale bool, cloudName 
 
 		if profile.EnableVMSSNodePublicIP == nil {
 			profile.EnableVMSSNodePublicIP = to.BoolPtr(DefaultEnableVMSSNodePublicIP)
+		}
+	}
+}
+
+// Sets default image selection values for a Windows AgentPoolProfile
+func (a *AgentPoolProfile) setImageDefaultsWindows(isUpgrade, isScale bool, isAzureStackCloud bool) {
+	if !isUpgrade && !isScale {
+		if !a.HasImage() {
+
+			publisher := DefaultWindowsPublisher
+			var offer string
+			var sku string
+			var version string
+
+			if isAzureStackCloud {
+				offer = DefaultAzureStackWindowsOffer
+				sku = DefaultAzureStackWindowsSku
+				version = DefaultAzureStackImageVersion
+			} else {
+				offer = DefaultWindowsOffer
+				sku = DefaultWindowsSku
+				version = DefaultImageVersion
+			}
+
+			a.Image = &Image{
+				MarketplaceImage: &MarketplaceImage{
+					Publisher: publisher,
+					Offer:     offer,
+					Sku:       sku,
+					Version:   version,
+				},
+			}
 		}
 	}
 }

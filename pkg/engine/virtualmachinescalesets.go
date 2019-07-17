@@ -352,6 +352,10 @@ func CreateAgentVMSS(cs *api.ContainerService, profile *api.AgentPoolProfile) Vi
 		dependencies = append(dependencies, "[variables('vnetID')]")
 	}
 
+	if profile.HasImage() && profile.Image.HasImageURL() {
+		dependencies = append(dependencies, fmt.Sprintf("%sosCustomImage", profile.Name))
+	}
+
 	orchProfile := cs.Properties.OrchestratorProfile
 	k8sConfig := orchProfile.KubernetesConfig
 	linuxProfile := cs.Properties.LinuxProfile
