@@ -578,34 +578,7 @@ func CreateAgentVMSS(cs *api.ContainerService, profile *api.AgentPoolProfile) Vi
 	}
 
 	vmssStorageProfile := compute.VirtualMachineScaleSetStorageProfile{}
-
-	image := profile.Image
-	if !profile.HasImage() || (profile.HasImage() && image.HasMarketplaceImage()) {
-		vmssStorageProfile.ImageReference = &compute.ImageReference{
-			Offer:     to.StringPtr(fmt.Sprintf("[variables('%sosImageOffer')]", profile.Name)),
-			Publisher: to.StringPtr(fmt.Sprintf("[variables('%sosImagePublisher')]", profile.Name)),
-			Sku:       to.StringPtr(fmt.Sprintf("[variables('%sosImageSKU')]", profile.Name)),
-			Version:   to.StringPtr(fmt.Sprintf("[variables('%sosImageVersion')]", profile.Name)),
-		}
-	} else if profile.HasImage() { 
-		if image.HasGalleryImage() {
-			v := fmt.Sprintf("[concat('/subscriptions/', '%s', '/resourceGroups/', '%s', '/providers/Microsoft.Compute/galleries/', '%s', '/images/', '%s', '/versions/', '%s')]", image.ImageRef.SubscriptionID, image.ImageRef.ResourceGroup, image.ImageRef.Gallery, image.ImageRef.Name, image.ImageRef.Version)
-			vmssStorageProfile.ImageReference = &compute.ImageReference{
-				ID: to.StringPtr(v),
-			}
-		} else if image.HasImageReference() {
-			v := fmt.Sprintf("[resourceId('%s', 'Microsoft.Compute/images', '%s')]", image.ImageRef.ResourceGroup, image.ImageRef.Name)
-			vmssStorageProfile.ImageReference = &compute.ImageReference{
-				ID: to.StringPtr(v),
-			}
-		} else {
-			v := fmt.Sprintf("[resourceId('Microsoft.Compute/images', '%sosCustomImage')]", profile.Name)
-			vmssStorageProfile.ImageReference = &compute.ImageReference{
-				ID: to.StringPtr(v),
-			}
-		}
-	}
-
+	vmssStorageProfile.ImageReference = getVmStorageProfileImageReference(profile)
 	vmssStorageProfile.DataDisks = getVMSSDataDisks(profile)
 
 	osDisk := compute.VirtualMachineScaleSetOSDisk{

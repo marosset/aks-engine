@@ -457,47 +457,8 @@ func createAgentAvailabilitySetVM(cs *api.ContainerService, profile *api.AgentPo
 	virtualMachine.OsProfile = &osProfile
 
 	storageProfile := compute.StorageProfile{}
-
-	if profile.IsWindows() {
-		if cs.Properties.WindowsProfile.HasCustomImage() {
-			storageProfile.ImageReference = &compute.ImageReference{
-				ID: to.StringPtr(fmt.Sprintf("[resourceId('Microsoft.Compute/images','%sCustomWindowsImage')]", profile.Name)),
-			}
-		} else {
-			storageProfile.ImageReference = &compute.ImageReference{
-				Offer:     to.StringPtr("[parameters('agentWindowsOffer')]"),
-				Publisher: to.StringPtr("[parameters('agentWindowsPublisher')]"),
-				Sku:       to.StringPtr("[parameters('agentWindowsSku')]"),
-				Version:   to.StringPtr("[parameters('agentWindowsVersion')]"),
-			}
-		}
-
-		if profile.HasDisks() {
-			storageProfile.DataDisks = getArmDataDisks(profile)
-		}
-
-	} else {
-		imageRef := profile.ImageRef
-		if profile.HasImageRef() {
-			if profile.HasImageGallery() {
-				storageProfile.ImageReference = &compute.ImageReference{
-					ID: to.StringPtr(fmt.Sprintf("[concat('/subscriptions/', '%s', '/resourceGroups/', parameters('%sosImageResourceGroup'), '/providers/Microsoft.Compute/galleries/', '%s', '/images/', parameters('%sosImageName'), '/versions/', '%s')]", imageRef.SubscriptionID, profile.Name, imageRef.Gallery, profile.Name, imageRef.Version)),
-				}
-			} else {
-				storageProfile.ImageReference = &compute.ImageReference{
-					ID: to.StringPtr(fmt.Sprintf("[resourceId(variables('%[1]sosImageResourceGroup'), 'Microsoft.Compute/images', variables('%[1]sosImageName'))]", profile.Name)),
-				}
-			}
-		} else {
-			storageProfile.ImageReference = &compute.ImageReference{
-				Offer:     to.StringPtr(fmt.Sprintf("[variables('%sosImageOffer')]", profile.Name)),
-				Publisher: to.StringPtr(fmt.Sprintf("[variables('%sosImagePublisher')]", profile.Name)),
-				Sku:       to.StringPtr(fmt.Sprintf("[variables('%sosImageSKU')]", profile.Name)),
-				Version:   to.StringPtr(fmt.Sprintf("[variables('%sosImageVersion')]", profile.Name)),
-			}
-			storageProfile.DataDisks = getArmDataDisks(profile)
-		}
-	}
+	storageProfile.ImageReference = getVmStorageProfileImageReference(profile)
+	storageProfile.DataDisks = getArmDataDisks(profile)
 
 	osDisk := compute.OSDisk{
 		CreateOption: compute.DiskCreateOptionTypesFromImage,

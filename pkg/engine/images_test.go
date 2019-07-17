@@ -81,3 +81,103 @@ func TestCreateImageFromURL(t *testing.T) {
 		})
 	}
 }
+
+func TestGetVmStorageProfileImageReference(t *testing.T) {
+	cases := []struct {
+		name                   string
+		p                      api.AgentPoolProfile
+		expectedImageReference compute.ImageReference
+	}{
+		{
+			name: "ImageURL",
+			p: api.AgentPoolProfile{
+				Name: "agent1",
+				Image: &api.Image{
+					ImageURL: "https://image.vhd",
+				},
+			},
+			expectedImageReference: compute.ImageReference{
+				ID: to.StringPtr("[resourceId('Microsoft.Compute/images', 'agent1osCustomImage')]"),
+			},
+		},
+		{
+			name: "ImageReference",
+			p: api.AgentPoolProfile{
+				Name: "agent1",
+				Image: &api.Image{
+					ImageRef: &api.ImageReference{
+						Name:          "image_name",
+						ResourceGroup: "resource_group",
+					},
+				},
+			},
+			expectedImageReference: compute.ImageReference{
+				ID: to.StringPtr("[resourceId('resource_group', 'Microsoft.Compute/images', 'image_name')]"),
+			},
+		},
+		{
+			name: "GalleryImage",
+			p: api.AgentPoolProfile{
+				Name: "agent1",
+				Image: &api.Image{
+					ImageRef: &api.ImageReference{
+						Gallery:        "gallery_name",
+						Name:           "image_name",
+						ResourceGroup:  "resource_group",
+						SubscriptionID: "00000000-0000-0000-0000-000000000000",
+						Version:        "0.1.0",
+					},
+				},
+			},
+			expectedImageReference: compute.ImageReference{
+				ID: to.StringPtr("[concat('/subscriptions/', '00000000-0000-0000-0000-000000000000', '/resourceGroups/', 'resource_group', '/providers/Microsoft.Compute/galleries/', 'gallery_name', '/images/', 'image_name', '/versions/', '0.1.0')]"),
+			},
+		},
+		{
+			name: "MarketplaceImage",
+			p: api.AgentPoolProfile{
+				Name: "agent1",
+				Image: &api.Image{
+					MarketplaceImage: &api.MarketplaceImage{
+						Offer:     "Offer",
+						Publisher: "Publisher",
+						Sku:       "Sku",
+						Version:   "Version",
+					},
+				},
+			},
+			expectedImageReference: compute.ImageReference{
+				Offer:     to.StringPtr("[variables('agent1osImageOffer')]"),
+				Publisher: to.StringPtr("[variables('agent1osImagePublisher')]"),
+				Sku:       to.StringPtr("[variables('agent1osImageSKU')]"),
+				Version:   to.StringPtr("[variables('agent1osImageVersion')]"),
+			},
+		},
+		{
+			name: "DefaultImage",
+			p: api.AgentPoolProfile{
+				Name: "agent1",
+			},
+			expectedImageReference: compute.ImageReference{
+				Offer:     to.StringPtr("[variables('agent1osImageOffer')]"),
+				Publisher: to.StringPtr("[variables('agent1osImagePublisher')]"),
+				Sku:       to.StringPtr("[variables('agent1osImageSKU')]"),
+				Version:   to.StringPtr("[variables('agent1osImageVersion')]"),
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			//		t.Parallel()
+
+			actual := getVmStorageProfileImageReference(&c.p)
+			expected := c.expectedImageReference
+			diff := cmp.Diff(actual, &expected)
+
+			if diff != "" {
+				t.Errorf("Unexpected diff while comparing compute.ImageReference ARM: %s", diff)
+			}
+		})
+	}
+}
