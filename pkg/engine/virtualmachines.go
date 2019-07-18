@@ -343,6 +343,10 @@ func createAgentAvailabilitySetVM(cs *api.ContainerService, profile *api.AgentPo
 		tags["resourceNameSuffix"] = to.StringPtr("[parameters('nameSuffix')]")
 	}
 
+	if profile.HasImage() && profile.Image.HasImageURL() {
+		dependencies = append(dependencies, fmt.Sprintf("%sosCustomImage", profile.Name))
+	}
+
 	armResource := ARMResource{
 		APIVersion: "[variables('apiVersionCompute')]",
 		DependsOn:  dependencies,
