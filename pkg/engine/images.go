@@ -44,14 +44,7 @@ func getVmStorageProfileImageReference(profile *api.AgentPoolProfile) *compute.I
 	var computeImageRef compute.ImageReference
 
 	image := profile.Image
-	if !profile.HasImage() || (profile.HasImage() && image.HasMarketplaceImage()) {
-		computeImageRef = compute.ImageReference{
-			Offer:     to.StringPtr(fmt.Sprintf("[variables('%sosImageOffer')]", profile.Name)),
-			Publisher: to.StringPtr(fmt.Sprintf("[variables('%sosImagePublisher')]", profile.Name)),
-			Sku:       to.StringPtr(fmt.Sprintf("[variables('%sosImageSKU')]", profile.Name)),
-			Version:   to.StringPtr(fmt.Sprintf("[variables('%sosImageVersion')]", profile.Name)),
-		}
-	} else if profile.HasImage() { 
+	 if profile.HasImage() { 
 		if image.HasGalleryImage() {
 			v := fmt.Sprintf("[concat('/subscriptions/', '%s', '/resourceGroups/', '%s', '/providers/Microsoft.Compute/galleries/', '%s', '/images/', '%s', '/versions/', '%s')]", image.ImageRef.SubscriptionID, image.ImageRef.ResourceGroup, image.ImageRef.Gallery, image.ImageRef.Name, image.ImageRef.Version)
 			computeImageRef = compute.ImageReference{
@@ -67,6 +60,15 @@ func getVmStorageProfileImageReference(profile *api.AgentPoolProfile) *compute.I
 			computeImageRef = compute.ImageReference{
 				ID: to.StringPtr(v),
 			}
+		}
+	} else {
+		// Default to marketplace image.
+		// Default values are set at defaults#setWindowsImageDefaults for Windows or 
+		computeImageRef = compute.ImageReference{
+			Offer:     to.StringPtr(fmt.Sprintf("[variables('%sosImageOffer')]", profile.Name)),
+			Publisher: to.StringPtr(fmt.Sprintf("[variables('%sosImagePublisher')]", profile.Name)),
+			Sku:       to.StringPtr(fmt.Sprintf("[variables('%sosImageSKU')]", profile.Name)),
+			Version:   to.StringPtr(fmt.Sprintf("[variables('%sosImageVersion')]", profile.Name)),
 		}
 	}
 

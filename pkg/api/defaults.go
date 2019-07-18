@@ -617,7 +617,7 @@ func (p *Properties) setAgentProfileDefaults(isUpgrade, isScale bool, cloudName 
 				profile.Distro = Ubuntu
 			}
 		} else if profile.OSType == Windows {
-			profile.setImageDefaultsWindows(isUpgrade, isScale, p.IsAzureStackCloud())
+			profile.setWindowsImageDefaults(isUpgrade, isScale, p.IsAzureStackCloud(), p.WindowsProfile)
 		}
 
 		// "--protect-kernel-defaults" is only true for VHD based VMs since the base Ubuntu distros don't have a /etc/sysctl.d/60-CIS.conf file.
@@ -665,9 +665,12 @@ func (p *Properties) setAgentProfileDefaults(isUpgrade, isScale bool, cloudName 
 	}
 }
 
-// Sets default image selection values for a Windows AgentPoolProfile
-func (a *AgentPoolProfile) setImageDefaultsWindows(isUpgrade, isScale bool, isAzureStackCloud bool) {
+// Sets default image selection values for a Windows AgentPoolProfile in order to maintain backwards if values are
+// specified on windowsProfile set them for all images on Windows agent pools that do not contain a reference from the api model.
+func (a *AgentPoolProfile) setWindowsImageDefaults(isUpgrade, isScale bool, isAzureStackCloud bool, windowsProfile *WindowsProfile) {
 	if !isUpgrade && !isScale {
+
+		// If agent pool already specifies an image do not process defaults
 		if !a.HasImage() {
 
 			publisher := DefaultWindowsPublisher
@@ -675,7 +678,19 @@ func (a *AgentPoolProfile) setImageDefaultsWindows(isUpgrade, isScale bool, isAz
 			var sku string
 			var version string
 
-			if isAzureStackCloud {
+			// Per documentation in clusterdefinitions.md if a must specify publisher, offer, and sku to use a custom marketplace image.
+			// They may optionally specify a version and if they do not they will get 'latest'.
+			if windowsProfile != nil && len(windowsProfile.WindowsPublisher) > 0 && len(windowsProfile.WindowsOffer) > 0 && len(windowsProfile.WindowsSku) >0 {
+				publisher = windowsProfile.WindowsPublisher
+				offer = windowsProfile.WindowsOffer
+				sku = windowsProfile.WindowsSku
+
+				if (len(windowsProfile.ImageVersion) > 0) {
+					version = windowsProfile.ImageVersion
+				} else {
+					version = "latest"
+				}
+			} else if isAzureStackCloud {
 				offer = DefaultAzureStackWindowsOffer
 				sku = DefaultAzureStackWindowsSku
 				version = DefaultAzureStackImageVersion

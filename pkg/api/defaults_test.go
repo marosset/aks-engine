@@ -1487,6 +1487,192 @@ func TestDistroDefaults(t *testing.T) {
 	}
 }
 
+// TestWindowsImageDefaults covers setWindowsImageDefaults
+func TestWindowsImageDefaults(t *testing.T) {
+	var cases = []struct {
+		name                     string
+		profile                  AgentPoolProfile
+		windowsProfile           WindowsProfile
+		expectedAgentPoolProfile AgentPoolProfile
+		isAzureStack             bool
+	}{
+		{
+			"defaults",
+			AgentPoolProfile{},
+			WindowsProfile{},
+			AgentPoolProfile{
+				Image: &Image{
+					MarketplaceImage: &MarketplaceImage{
+						Publisher: DefaultWindowsPublisher,
+						Offer:     DefaultWindowsOffer,
+						Sku:       DefaultWindowsSku,
+						Version:   DefaultImageVersion,
+					},
+				},
+			},
+			false,
+		},
+		{
+			"AzureStack defaults",
+			AgentPoolProfile{},
+			WindowsProfile{},
+			AgentPoolProfile{
+				Image: &Image{
+					MarketplaceImage: &MarketplaceImage{
+						Publisher: DefaultWindowsPublisher,
+						Offer:     DefaultAzureStackWindowsOffer,
+						Sku:       DefaultAzureStackWindowsSku,
+						Version:   DefaultAzureStackImageVersion,
+					},
+				},
+			},
+			true,
+		}, {
+			"WindowsProfile overrides with version",
+			AgentPoolProfile{},
+			WindowsProfile{
+				WindowsPublisher: "publisher",
+				WindowsOffer:     "offer",
+				WindowsSku:       "sku",
+				ImageVersion:     "version",
+			},
+			AgentPoolProfile{
+				Image: &Image{
+					MarketplaceImage: &MarketplaceImage{
+						Publisher: "publisher",
+						Offer:     "offer",
+						Sku:       "sku",
+						Version:   "version",
+					},
+				},
+			},
+			false,
+		}, {
+			"overrides without version",
+			AgentPoolProfile{},
+			WindowsProfile{
+				WindowsPublisher: "publisher",
+				WindowsOffer:     "offer",
+				WindowsSku:       "sku",
+				ImageVersion:     "",
+			},
+			AgentPoolProfile{
+				Image: &Image{
+					MarketplaceImage: &MarketplaceImage{
+						Publisher: "publisher",
+						Offer:     "offer",
+						Sku:       "sku",
+						Version:   "latest",
+					},
+				},
+			},
+			false,
+		}, {
+			"image url on agent pool no overrides",
+			AgentPoolProfile{
+				Image: &Image{
+					ImageURL: "https://some.vhd",
+				},
+			},
+			WindowsProfile{},
+			AgentPoolProfile{
+				Image: &Image{
+					ImageURL: "https://some.vhd",
+				},
+			},
+			false,
+		}, {
+			"image url on agent pool overrides",
+			AgentPoolProfile{
+				Image: &Image{
+					ImageURL: "https://some.vhd",
+				},
+			},
+			WindowsProfile{
+				WindowsPublisher: "publisher",
+				WindowsOffer:     "offer",
+				WindowsSku:       "sku",
+				ImageVersion:     "",
+			},
+			AgentPoolProfile{
+				Image: &Image{
+					ImageURL: "https://some.vhd",
+				},
+			},
+			false,
+		}, {
+			"marketplace image on agent pool no overrides",
+			AgentPoolProfile{
+				Image: &Image{
+					MarketplaceImage: &MarketplaceImage{
+						Publisher: "publisher",
+						Offer:     "offer",
+						Sku:       "sku",
+						Version:   "version",
+					},
+				},
+			},
+			WindowsProfile{},
+			AgentPoolProfile{
+				Image: &Image{
+					MarketplaceImage: &MarketplaceImage{
+						Publisher: "publisher",
+						Offer:     "offer",
+						Sku:       "sku",
+						Version:   "version",
+					},
+				},
+			},
+			false,
+		}, {
+			"marketplace image on agent pool with overrides",
+			AgentPoolProfile{
+				Image: &Image{
+					MarketplaceImage: &MarketplaceImage{
+						Publisher: "publisher",
+						Offer:     "offer",
+						Sku:       "sku",
+						Version:   "version",
+					},
+				},
+			},
+			WindowsProfile{
+				WindowsPublisher: "override",
+				WindowsOffer:     "override",
+				WindowsSku:       "override",
+				ImageVersion:     "",
+			},
+			AgentPoolProfile{
+				Image: &Image{
+					MarketplaceImage: &MarketplaceImage{
+						Publisher: "publisher",
+						Offer:     "offer",
+						Sku:       "sku",
+						Version:   "version",
+					},
+				},
+			},
+			false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+
+			actual := c.expectedAgentPoolProfile
+			actual.setWindowsImageDefaults(false, false, c.isAzureStack, &c.windowsProfile)
+
+			expected := c.expectedAgentPoolProfile
+
+			diff := cmp.Diff(&actual, &expected)
+
+			if diff != "" {
+				t.Errorf("Unexpected diff while comparing setWIndowsImageDefaults behavior: %s", diff)
+			}
+		})
+	}
+}
+
 func TestWindowsProfileDefaults(t *testing.T) {
 
 	var tests = []struct {
@@ -1839,6 +2025,7 @@ func TestDefaultCloudProvider(t *testing.T) {
 			to.Bool(properties.OrchestratorProfile.KubernetesConfig.CloudProviderBackoff))
 	}
 }
+
 func TestSetCertDefaults(t *testing.T) {
 	cs := &ContainerService{
 		Properties: &Properties{
@@ -1994,6 +2181,7 @@ func TestProxyModeDefaults(t *testing.T) {
 		t.Fatalf("ProxyMode string not the expected default value, got %s, expected %s", properties.OrchestratorProfile.KubernetesConfig.ProxyMode, KubeProxyModeIPVS)
 	}
 }
+
 func TestSetCustomCloudProfileDefaults(t *testing.T) {
 
 	// Test that the ResourceManagerVMDNSSuffix is set in EndpointConfig
