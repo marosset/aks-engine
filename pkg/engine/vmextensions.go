@@ -107,7 +107,11 @@ func CreateCustomScriptExtension(cs *api.ContainerService) VirtualMachineExtensi
 
 func createAgentVMASCustomScriptExtension(cs *api.ContainerService, profile *api.AgentPoolProfile) VirtualMachineExtensionARM {
 	location := "[variables('location')]"
-	name := fmt.Sprintf("[concat(variables('%[1]sVMNamePrefix'), copyIndex(variables('%[1]sOffset')),'/cse', '-agent-', copyIndex(variables('%[1]sOffset')))]", profile.Name)
+	profileOsType := "linux"
+	if profile.IsWindows() {
+		profileOsType = "windows"
+	}
+	name := fmt.Sprintf("[concat(variables('%[1]sVMNamePrefix'), copyIndex(variables('%[1]sOffset')),'/cse', '-agent-%2s-', copyIndex(variables('%[1]sOffset')))]", profile.Name, profileOsType)
 	outBoundCmd := ""
 	registry := ""
 	ncBinary := "nc"

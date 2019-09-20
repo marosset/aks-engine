@@ -312,7 +312,7 @@ func TestCreateAgentVMASCustomScriptExtension(t *testing.T) {
 		},
 		VirtualMachineExtension: compute.VirtualMachineExtension{
 			Location: to.StringPtr("[variables('location')]"),
-			Name:     to.StringPtr("[concat(variables('sampleVMNamePrefix'), copyIndex(variables('sampleOffset')),'/cse', '-agent-', copyIndex(variables('sampleOffset')))]"),
+			Name:     to.StringPtr("[concat(variables('sampleVMNamePrefix'), copyIndex(variables('sampleOffset')),'/cse', '-agent-linux-', copyIndex(variables('sampleOffset')))]"),
 			VirtualMachineExtensionProperties: &compute.VirtualMachineExtensionProperties{
 				Publisher:               to.StringPtr("Microsoft.Azure.Extensions"),
 				Type:                    to.StringPtr("CustomScript"),
@@ -463,7 +463,7 @@ func TestCreateCustomExtensions(t *testing.T) {
 					"count": "[sub(variables('windowspool1Count'), variables('windowspool1Offset'))]",
 					"name":  "winrmExtensionLoop",
 				},
-				DependsOn: []string{"[concat('Microsoft.Compute/virtualMachines/', variables('windowspool1VMNamePrefix'), copyIndex(variables('windowspool1Offset')), '/extensions/cse', '-agent-', copyIndex(variables('windowspool1Offset')))]"},
+				DependsOn: []string{"[concat('Microsoft.Compute/virtualMachines/', variables('windowspool1VMNamePrefix'), copyIndex(variables('windowspool1Offset')), '/extensions/cse', '-agent-windows-', copyIndex(variables('windowspool1Offset')))]"},
 			},
 			DeploymentExtended: resources.DeploymentExtended{
 				Name: to.StringPtr("[concat(variables('windowspool1VMNamePrefix'), copyIndex(variables('windowspool1Offset')), 'winrm')]"),
@@ -492,7 +492,7 @@ func TestCreateCustomExtensions(t *testing.T) {
 					"count": "[sub(variables('windowspool2Count'), variables('windowspool2Offset'))]",
 					"name":  "winrmExtensionLoop",
 				},
-				DependsOn: []string{"[concat('Microsoft.Compute/virtualMachines/', variables('windowspool2VMNamePrefix'), copyIndex(variables('windowspool2Offset')), '/extensions/cse', '-agent-', copyIndex(variables('windowspool2Offset')))]"},
+				DependsOn: []string{"[concat('Microsoft.Compute/virtualMachines/', variables('windowspool2VMNamePrefix'), copyIndex(variables('windowspool2Offset')), '/extensions/cse', '-agent-windows-', copyIndex(variables('windowspool2Offset')))]"},
 			},
 			DeploymentExtended: resources.DeploymentExtended{
 				Name: to.StringPtr("[concat(variables('windowspool2VMNamePrefix'), copyIndex(variables('windowspool2Offset')), 'winrm')]"),
