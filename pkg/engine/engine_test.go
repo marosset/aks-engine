@@ -24,6 +24,7 @@ import (
 	"github.com/Azure/aks-engine/pkg/i18n"
 	"github.com/leonelquinteros/gotext"
 	"github.com/pkg/errors"
+	"github.com/google/go-cmp/cmp"
 )
 
 const (
@@ -1523,7 +1524,7 @@ func TestGetAgentPoolLinkedTemplateText(t *testing.T) {
 				RootURL: "https://raw.githubusercontent.com/Azure/aks-engine/master/",
 			},
 			singleOrAll: "single",
-			expected:    `{ "name": "[concat(variables('fooVMNamePrefix'), copyIndex(variables('fooOffset')), 'winrm')]", "type": "Microsoft.Resources/deployments", "apiVersion": "[variables('apiVersionDeployments')]", "dependsOn": [ "[concat('Microsoft.Compute/virtualMachines/', variables('fooVMNamePrefix'), copyIndex(variables('fooOffset')), '/extensions/cse', '-agent-', copyIndex(variables('fooOffset')))]" ], "copy": { "count": 1, "name": "winrmExtensionLoop" }, "properties": { "mode": "Incremental", "templateLink": { "uri": "https://raw.githubusercontent.com/Azure/aks-engine/master/extensions/winrm/v1/template.json", "contentVersion": "1.0.0.0" }, "parameters": { "artifactsLocation": { "value": "https://raw.githubusercontent.com/Azure/aks-engine/master/" }, "apiVersionDeployments": { "value": "[variables('apiVersionDeployments')]" }, "targetVMName": { "value": "[concat(variables('fooVMNamePrefix'), copyIndex(variables('fooOffset')))]" }, "targetVMType": { "value": "agent" }, "extensionParameters": { "value": "[parameters('winrmParameters')]" }, "vmIndex":{ "value": "[copyIndex(variables('fooOffset'))]" } } } }`,
+			expected:    `{ "name": "[concat(variables('fooVMNamePrefix'), copyIndex(variables('fooOffset')), 'winrm')]", "type": "Microsoft.Resources/deployments", "apiVersion": "[variables('apiVersionDeployments')]", "dependsOn": [ "[concat('Microsoft.Compute/virtualMachines/', variables('fooVMNamePrefix'), copyIndex(variables('fooOffset')), '/extensions/cse', '-agent-linux-', copyIndex(variables('fooOffset')))]" ], "copy": { "count": 1, "name": "winrmExtensionLoop" }, "properties": { "mode": "Incremental", "templateLink": { "uri": "https://raw.githubusercontent.com/Azure/aks-engine/master/extensions/winrm/v1/template.json", "contentVersion": "1.0.0.0" }, "parameters": { "artifactsLocation": { "value": "https://raw.githubusercontent.com/Azure/aks-engine/master/" }, "apiVersionDeployments": { "value": "[variables('apiVersionDeployments')]" }, "targetVMName": { "value": "[concat(variables('fooVMNamePrefix'), copyIndex(variables('fooOffset')))]" }, "targetVMType": { "value": "agent-linux" }, "extensionParameters": { "value": "[parameters('winrmParameters')]" }, "vmIndex":{ "value": "[copyIndex(variables('fooOffset'))]" } } } }`,
 			expectedErr: nil,
 		},
 		{
@@ -1538,7 +1539,7 @@ func TestGetAgentPoolLinkedTemplateText(t *testing.T) {
 				RootURL: "https://raw.githubusercontent.com/Azure/aks-engine/master/",
 			},
 			singleOrAll: "single",
-			expected:    `{ "name": "[concat(variables('fooVMNamePrefix'), copyIndex(), 'winrm')]", "type": "Microsoft.Resources/deployments", "apiVersion": "[variables('apiVersionDeployments')]", "dependsOn": [ "[concat('Microsoft.Compute/virtualMachines/', variables('fooVMNamePrefix'), copyIndex(), '/extensions/cse', '-agent-', copyIndex())]" ], "copy": { "count": 1, "name": "winrmExtensionLoop" }, "properties": { "mode": "Incremental", "templateLink": { "uri": "https://raw.githubusercontent.com/Azure/aks-engine/master/extensions/winrm/v1/template.json", "contentVersion": "1.0.0.0" }, "parameters": { "artifactsLocation": { "value": "https://raw.githubusercontent.com/Azure/aks-engine/master/" }, "apiVersionDeployments": { "value": "[variables('apiVersionDeployments')]" }, "targetVMName": { "value": "[concat(variables('fooVMNamePrefix'), copyIndex())]" }, "targetVMType": { "value": "agent" }, "extensionParameters": { "value": "[parameters('winrmParameters')]" }, "vmIndex":{ "value": "[copyIndex()]" } } } }`,
+			expected:    `{ "name": "[concat(variables('fooVMNamePrefix'), copyIndex(), 'winrm')]", "type": "Microsoft.Resources/deployments", "apiVersion": "[variables('apiVersionDeployments')]", "dependsOn": [ "[concat('Microsoft.Compute/virtualMachines/', variables('fooVMNamePrefix'), copyIndex(), '/extensions/cse', '-agent-linux-', copyIndex())]" ], "copy": { "count": 1, "name": "winrmExtensionLoop" }, "properties": { "mode": "Incremental", "templateLink": { "uri": "https://raw.githubusercontent.com/Azure/aks-engine/master/extensions/winrm/v1/template.json", "contentVersion": "1.0.0.0" }, "parameters": { "artifactsLocation": { "value": "https://raw.githubusercontent.com/Azure/aks-engine/master/" }, "apiVersionDeployments": { "value": "[variables('apiVersionDeployments')]" }, "targetVMName": { "value": "[concat(variables('fooVMNamePrefix'), copyIndex())]" }, "targetVMType": { "value": "agent-linux" }, "extensionParameters": { "value": "[parameters('winrmParameters')]" }, "vmIndex":{ "value": "[copyIndex()]" } } } }`,
 			expectedErr: nil,
 		},
 		{
@@ -1553,7 +1554,7 @@ func TestGetAgentPoolLinkedTemplateText(t *testing.T) {
 				RootURL: "https://raw.githubusercontent.com/Azure/aks-engine/master/",
 			},
 			singleOrAll: "All",
-			expected:    `{ "name": "[concat(variables('fooVMNamePrefix'), copyIndex(), 'winrm')]", "type": "Microsoft.Resources/deployments", "apiVersion": "[variables('apiVersionDeployments')]", "dependsOn": [ "[concat('Microsoft.Compute/virtualMachines/', variables('fooVMNamePrefix'), copyIndex(), '/extensions/cse', '-agent-', copyIndex())]" ], "copy": { "count": "[variables('fooCount'))]", "name": "winrmExtensionLoop" }, "properties": { "mode": "Incremental", "templateLink": { "uri": "https://raw.githubusercontent.com/Azure/aks-engine/master/extensions/winrm/v1/template.json", "contentVersion": "1.0.0.0" }, "parameters": { "artifactsLocation": { "value": "https://raw.githubusercontent.com/Azure/aks-engine/master/" }, "apiVersionDeployments": { "value": "[variables('apiVersionDeployments')]" }, "targetVMName": { "value": "[concat(variables('fooVMNamePrefix'), copyIndex())]" }, "targetVMType": { "value": "agent" }, "extensionParameters": { "value": "[parameters('winrmParameters')]" }, "vmIndex":{ "value": "[copyIndex()]" } } } }`,
+			expected:    `{ "name": "[concat(variables('fooVMNamePrefix'), copyIndex(), 'winrm')]", "type": "Microsoft.Resources/deployments", "apiVersion": "[variables('apiVersionDeployments')]", "dependsOn": [ "[concat('Microsoft.Compute/virtualMachines/', variables('fooVMNamePrefix'), copyIndex(), '/extensions/cse', '-agent-linux-', copyIndex())]" ], "copy": { "count": "[variables('fooCount'))]", "name": "winrmExtensionLoop" }, "properties": { "mode": "Incremental", "templateLink": { "uri": "https://raw.githubusercontent.com/Azure/aks-engine/master/extensions/winrm/v1/template.json", "contentVersion": "1.0.0.0" }, "parameters": { "artifactsLocation": { "value": "https://raw.githubusercontent.com/Azure/aks-engine/master/" }, "apiVersionDeployments": { "value": "[variables('apiVersionDeployments')]" }, "targetVMName": { "value": "[concat(variables('fooVMNamePrefix'), copyIndex())]" }, "targetVMType": { "value": "agent-linux" }, "extensionParameters": { "value": "[parameters('winrmParameters')]" }, "vmIndex":{ "value": "[copyIndex()]" } } } }`,
 			expectedErr: nil,
 		},
 		{
@@ -1568,7 +1569,7 @@ func TestGetAgentPoolLinkedTemplateText(t *testing.T) {
 				RootURL: "https://raw.githubusercontent.com/Azure/aks-engine/master/",
 			},
 			singleOrAll: "All",
-			expected:    `{ "name": "[concat(variables('fooVMNamePrefix'), copyIndex(variables('fooOffset')), 'winrm')]", "type": "Microsoft.Resources/deployments", "apiVersion": "[variables('apiVersionDeployments')]", "dependsOn": [ "[concat('Microsoft.Compute/virtualMachines/', variables('fooVMNamePrefix'), copyIndex(variables('fooOffset')), '/extensions/cse', '-agent-', copyIndex(variables('fooOffset')))]" ], "copy": { "count": "[sub(variables('fooCount'), variables('fooOffset'))]", "name": "winrmExtensionLoop" }, "properties": { "mode": "Incremental", "templateLink": { "uri": "https://raw.githubusercontent.com/Azure/aks-engine/master/extensions/winrm/v1/template.json", "contentVersion": "1.0.0.0" }, "parameters": { "artifactsLocation": { "value": "https://raw.githubusercontent.com/Azure/aks-engine/master/" }, "apiVersionDeployments": { "value": "[variables('apiVersionDeployments')]" }, "targetVMName": { "value": "[concat(variables('fooVMNamePrefix'), copyIndex(variables('fooOffset')))]" }, "targetVMType": { "value": "agent" }, "extensionParameters": { "value": "[parameters('winrmParameters')]" }, "vmIndex":{ "value": "[copyIndex(variables('fooOffset'))]" } } } }`,
+			expected:    `{ "name": "[concat(variables('fooVMNamePrefix'), copyIndex(variables('fooOffset')), 'winrm')]", "type": "Microsoft.Resources/deployments", "apiVersion": "[variables('apiVersionDeployments')]", "dependsOn": [ "[concat('Microsoft.Compute/virtualMachines/', variables('fooVMNamePrefix'), copyIndex(variables('fooOffset')), '/extensions/cse', '-agent-linux-', copyIndex(variables('fooOffset')))]" ], "copy": { "count": "[sub(variables('fooCount'), variables('fooOffset'))]", "name": "winrmExtensionLoop" }, "properties": { "mode": "Incremental", "templateLink": { "uri": "https://raw.githubusercontent.com/Azure/aks-engine/master/extensions/winrm/v1/template.json", "contentVersion": "1.0.0.0" }, "parameters": { "artifactsLocation": { "value": "https://raw.githubusercontent.com/Azure/aks-engine/master/" }, "apiVersionDeployments": { "value": "[variables('apiVersionDeployments')]" }, "targetVMName": { "value": "[concat(variables('fooVMNamePrefix'), copyIndex(variables('fooOffset')))]" }, "targetVMType": { "value": "agent-linux" }, "extensionParameters": { "value": "[parameters('winrmParameters')]" }, "vmIndex":{ "value": "[copyIndex(variables('fooOffset'))]" } } } }`,
 			expectedErr: nil,
 		},
 	}
@@ -1577,12 +1578,17 @@ func TestGetAgentPoolLinkedTemplateText(t *testing.T) {
 		ret, err := getAgentPoolLinkedTemplateText(c.agentPoolProfile, c.orchestrator, c.extensionProfile, c.singleOrAll)
 		ret = strings.Join(strings.Fields(ret), " ")
 		expected := strings.Join(strings.Fields(c.expected), " ")
-		if ret != expected {
-			t.Fatalf("expected getAgentPoolLinkedTemplateText(%v, %s, %v, %s) to return %s but instead got %s", c.agentPoolProfile, c.orchestrator, c.extensionProfile, c.singleOrAll, expected, ret)
+
+		diff := cmp.Diff(ret, expected)
+
+		if diff != "" {
+			t.Errorf("unexpected diff comparing getAgentPoolLinkedText output: %s", diff)
 		}
+
 		if err != c.expectedErr {
 			t.Fatalf("expected getAgentPoolLinkedTemplateText(%v, %s, %v, %s) to return %s but instead got %s", c.agentPoolProfile, c.orchestrator, c.extensionProfile, c.singleOrAll, c.expectedErr, err)
 		}
+		
 	}
 }
 

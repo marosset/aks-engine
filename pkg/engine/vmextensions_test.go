@@ -406,6 +406,7 @@ func TestCreateAgentVMASCustomScriptExtension(t *testing.T) {
 	expectedCSE.Publisher = to.StringPtr("Microsoft.Compute")
 	expectedCSE.VirtualMachineExtensionProperties.Type = to.StringPtr("CustomScriptExtension")
 	expectedCSE.TypeHandlerVersion = to.StringPtr("1.8")
+	expectedCSE.Name = to.StringPtr("[concat(variables('sampleVMNamePrefix'), copyIndex(variables('sampleOffset')),'/cse', '-agent-windows-', copyIndex(variables('sampleOffset')))]")
 	expectedCSE.ProtectedSettings = &map[string]interface{}{
 		"commandToExecute": "[concat('echo %DATE%,%TIME%,%COMPUTERNAME% && powershell.exe -ExecutionPolicy Unrestricted -command \"', '$arguments = ', variables('singleQuote'),'-MasterIP ',variables('kubernetesAPIServerIP'),' -KubeDnsServiceIp ',parameters('kubeDnsServiceIp'),' -MasterFQDNPrefix ',variables('masterFqdnPrefix'),' -Location ',variables('location'),' -TargetEnvironment ',parameters('targetEnvironment'),' -AgentKey ',parameters('clientPrivateKey'),' -AADClientId ',variables('servicePrincipalClientId'),' -AADClientSecret ',variables('singleQuote'),variables('singleQuote'),base64(variables('servicePrincipalClientSecret')),variables('singleQuote'),variables('singleQuote'),' -NetworkAPIVersion ',variables('apiVersionNetwork'),' ',variables('singleQuote'), ' ; ', variables('windowsCustomScriptSuffix'), '\" > %SYSTEMDRIVE%\\AzureData\\CustomDataSetupScript.log 2>&1')]",
 	}
@@ -428,6 +429,11 @@ func TestCreateCustomExtensions(t *testing.T) {
 				Version: "v1",
 				RootURL: "https://raw.githubusercontent.com/Azure/aks-engine/master/",
 			},
+			{
+				Name:    "hello-world-k8s",
+				Version: "v1",
+				RootURL: "https://raw.githubusercontent.com/Azure/aks-engine/master/",
+			},
 		},
 		AgentPoolProfiles: []*api.AgentPoolProfile{
 			{
@@ -447,6 +453,15 @@ func TestCreateCustomExtensions(t *testing.T) {
 				Extensions: []api.Extension{
 					{
 						Name: "winrm",
+					},
+				},
+			},
+			{
+				Name:                "linuxpool1",
+				AvailabilityProfile: "AvailabilitySet",
+				Extensions: []api.Extension{
+					{
+						Name: "hello-world-k8s",
 					},
 				},
 			},
@@ -477,7 +492,7 @@ func TestCreateCustomExtensions(t *testing.T) {
 						"artifactsLocation":     map[string]interface{}{"value": "https://raw.githubusercontent.com/Azure/aks-engine/master/"},
 						"extensionParameters":   map[string]interface{}{"value": "[parameters('winrmParameters')]"},
 						"targetVMName":          map[string]interface{}{"value": "[concat(variables('windowspool1VMNamePrefix'), copyIndex(variables('windowspool1Offset')))]"},
-						"targetVMType":          map[string]interface{}{"value": "agent"},
+						"targetVMType":          map[string]interface{}{"value": "agent-windows"},
 						"vmIndex":               map[string]interface{}{"value": "[copyIndex(variables('windowspool1Offset'))]"},
 					},
 					Mode: resources.DeploymentMode("Incremental"),
@@ -506,8 +521,37 @@ func TestCreateCustomExtensions(t *testing.T) {
 						"artifactsLocation":     map[string]interface{}{"value": "https://raw.githubusercontent.com/Azure/aks-engine/master/"},
 						"extensionParameters":   map[string]interface{}{"value": "[parameters('winrmParameters')]"},
 						"targetVMName":          map[string]interface{}{"value": "[concat(variables('windowspool2VMNamePrefix'), copyIndex(variables('windowspool2Offset')))]"},
-						"targetVMType":          map[string]interface{}{"value": "agent"},
+						"targetVMType":          map[string]interface{}{"value": "agent-windows"},
 						"vmIndex":               map[string]interface{}{"value": "[copyIndex(variables('windowspool2Offset'))]"},
+					},
+					Mode: resources.DeploymentMode("Incremental"),
+				},
+				Type: to.StringPtr("Microsoft.Resources/deployments"),
+			},
+		},
+		{
+			DeploymentARMResource: DeploymentARMResource{
+				APIVersion: "[variables('apiVersionDeployments')]",
+				Copy: map[string]string{
+					"count": "[sub(variables('linuxpool1Count'), variables('linuxpool1Offset'))]",
+					"name":  "helloWorldExtensionLoop",
+				},
+				DependsOn: []string{"[concat('Microsoft.Compute/virtualMachines/', variables('linuxpool1VMNamePrefix'), copyIndex(variables('linuxpool1Offset')), '/extensions/cse', '-agent-linux-', copyIndex(variables('linuxpool1Offset')))]"},
+			},
+			DeploymentExtended: resources.DeploymentExtended{
+				Name: to.StringPtr("[concat(variables('linuxpool1VMNamePrefix'), copyIndex(variables('linuxpool1Offset')), 'HelloWorldK8s')]"),
+				Properties: &resources.DeploymentPropertiesExtended{
+					TemplateLink: &resources.TemplateLink{
+						URI:            to.StringPtr("https://raw.githubusercontent.com/Azure/aks-engine/master/extensions/hello-world-k8s/v1/template.json"),
+						ContentVersion: to.StringPtr("1.0.0.0"),
+					},
+					Parameters: map[string]interface{}{
+						"apiVersionDeployments": map[string]interface{}{"value": "[variables('apiVersionDeployments')]"},
+						"artifactsLocation":     map[string]interface{}{"value": "https://raw.githubusercontent.com/Azure/aks-engine/master/"},
+						"extensionParameters":   map[string]interface{}{"value": "[parameters('hello-world-k8sParameters')]"},
+						"targetVMName":          map[string]interface{}{"value": "[concat(variables('linuxpool1VMNamePrefix'), copyIndex(variables('linuxpool1Offset')))]"},
+						"targetVMType":          map[string]interface{}{"value": "agent-linux"},
+						"vmIndex":               map[string]interface{}{"value": "[copyIndex(variables('linuxpool1Offset'))]"},
 					},
 					Mode: resources.DeploymentMode("Incremental"),
 				},

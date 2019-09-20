@@ -820,7 +820,7 @@ func getMasterLinkedTemplateText(orchestratorType string, extensionProfile *api.
 		loopCount = "1"
 	}
 	return internalGetPoolLinkedTemplateText(extTargetVMNamePrefix, orchestratorType, loopCount,
-		loopOffset, extensionProfile)
+		loopOffset, nil, extensionProfile)
 }
 
 func getAgentPoolLinkedTemplateText(agentPoolProfile *api.AgentPoolProfile, orchestratorType string, extensionProfile *api.ExtensionProfile, singleOrAll string) (string, error) {
@@ -841,10 +841,10 @@ func getAgentPoolLinkedTemplateText(agentPoolProfile *api.AgentPoolProfile, orch
 	}
 
 	return internalGetPoolLinkedTemplateText(extTargetVMNamePrefix, orchestratorType, loopCount,
-		loopOffset, extensionProfile)
+		loopOffset, agentPoolProfile, extensionProfile)
 }
 
-func internalGetPoolLinkedTemplateText(extTargetVMNamePrefix, orchestratorType, loopCount, loopOffset string, extensionProfile *api.ExtensionProfile) (string, error) {
+func internalGetPoolLinkedTemplateText(extTargetVMNamePrefix, orchestratorType, loopCount, loopOffset string, agentPoolProfile *api.AgentPoolProfile, extensionProfile *api.ExtensionProfile) (string, error) {
 	dta, e := getLinkedTemplateTextForURL(extensionProfile.RootURL, orchestratorType, extensionProfile.Name, extensionProfile.Version, extensionProfile.URLQuery)
 	if e != nil {
 		return "", e
@@ -852,7 +852,11 @@ func internalGetPoolLinkedTemplateText(extTargetVMNamePrefix, orchestratorType, 
 	if strings.Contains(extTargetVMNamePrefix, "master") {
 		dta = strings.Replace(dta, "EXTENSION_TARGET_VM_TYPE", "master", -1)
 	} else {
-		dta = strings.Replace(dta, "EXTENSION_TARGET_VM_TYPE", "agent", -1)
+		if agentPoolProfile.IsWindows() {
+			dta = strings.Replace(dta, "EXTENSION_TARGET_VM_TYPE", "agent-windows", -1)
+		} else {
+			dta = strings.Replace(dta, "EXTENSION_TARGET_VM_TYPE", "agent-linux", -1)
+		}
 	}
 	extensionsParameterReference := fmt.Sprintf("[parameters('%sParameters')]", extensionProfile.Name)
 	dta = strings.Replace(dta, "EXTENSION_PARAMETERS_REPLACE", extensionsParameterReference, -1)
