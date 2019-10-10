@@ -421,45 +421,6 @@ if (!`$hnsNetwork)
     New-HNSNetwork -Type `$global:NetworkMode -AddressPrefix "192.168.255.0/30" -Gateway "192.168.255.1" -Name `$global:ExternalNetwork -Verbose
 }
 
-# Find if network created by CNI exists, if yes, remove it
-# This is required to keep the network non-persistent behavior
-# Going forward, this would be done by HNS automatically during restart of the node
-
-`$hnsNetwork = Get-HnsNetwork | ? Name -EQ $KubeNetwork
-if (`$hnsNetwork)
-{
-    # Cleanup all containers
-    docker ps -q | foreach {docker rm `$_ -f}
-
-    Write-Host "Cleaning up old HNS network found"
-    Remove-HnsNetwork `$hnsNetwork
-    # Kill all cni instances & stale data left by cni
-    # Cleanup all files related to cni
-    taskkill /IM azure-vnet.exe /f
-    taskkill /IM azure-vnet-ipam.exe /f
-    `$cnijson = [io.path]::Combine("$KubeDir", "azure-vnet-ipam.json")
-    if ((Test-Path `$cnijson))
-    {
-        Remove-Item `$cnijson
-    }
-    `$cnilock = [io.path]::Combine("$KubeDir", "azure-vnet-ipam.json.lock")
-    if ((Test-Path `$cnilock))
-    {
-        Remove-Item `$cnilock
-    }
-
-    `$cnijson = [io.path]::Combine("$KubeDir", "azure-vnet.json")
-    if ((Test-Path `$cnijson))
-    {
-        Remove-Item `$cnijson
-    }
-    `$cnilock = [io.path]::Combine("$KubeDir", "azure-vnet.json.lock")
-    if ((Test-Path `$cnilock))
-    {
-        Remove-Item `$cnilock
-    }
-}
-
 # Restart Kubeproxy, which would wait, until the network is created
 Restart-Service Kubeproxy
 
@@ -617,12 +578,6 @@ while (!`$hnsNetwork)
     Start-Sleep 10
     `$hnsNetwork = Get-HnsNetwork | ? Name -EQ $KubeNetwork
 }
-
-#
-# cleanup the persisted policy lists
-#
-ipmo `$global:HNSModule
-Get-HnsPolicyList | Remove-HnsPolicyList
 
 $KubeDir\kube-proxy.exe --v=3 --proxy-mode=kernelspace --hostname-override=$env:computername --kubeconfig=$KubeDir\config
 "@
