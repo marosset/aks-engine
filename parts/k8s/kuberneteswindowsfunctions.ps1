@@ -95,3 +95,14 @@ function Retry-Command
         }
     }
 }
+
+function Register-RestartCleanupTask
+{
+    Write-Log "Creating a startup task to run on-restart.ps1"
+    Copy-Item -Path "c:\AzureData\k8s\on-restart.ps1" -Destination "c:\k\on-restart.ps1"
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-File `"c:\k\on-restart.ps1`""
+    $prinical = New-ScheduledTaskPrincipal -UserId SYSTEM -LogonType ServiceAccount -RunLevel Highest
+    $trigger = New-JobTrigger -AtStartup -RandomDelay 00:00:05
+    $definition = New-ScheduledTask -Action $action -Principal $prinical -Trigger $trigger -Description "k8s-restart-job"
+    Register-ScheduledTask -TaskName "k8s-restart-job" -InputObject $definition
+}
