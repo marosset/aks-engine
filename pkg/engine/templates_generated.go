@@ -25025,7 +25025,11 @@ function Retry-Command
     }
 }
 
+<<<<<<< HEAD
 function Register-NodeCleanupScriptTask
+=======
+function Register-RestartCleanupTask
+>>>>>>> WIP generate CNI config outside of startkubelet.ps1
 {
     Write-Log "Creating a startup task to run on-restart.ps1"
     Copy-Item -Path "c:\AzureData\k8s\windowsnodecleanup.ps1" -Destination "c:\k\windowsnodecleanup.ps1"
@@ -25365,7 +25369,11 @@ try
             Remove-Item $CacheDir -Recurse -Force
         }
 
+<<<<<<< HEAD
         Register-NodeCleanupScriptTask
+=======
+        Register-RestartCleanupTask
+>>>>>>> WIP generate CNI config outside of startkubelet.ps1
 
         Write-Log "Setup Complete, reboot computer"
         Restart-Computer
@@ -25379,7 +25387,11 @@ try
 catch
 {
     Write-Error $_
+<<<<<<< HEAD
     exit 1
+=======
+    [Enviornment]::Exit(1)
+>>>>>>> WIP generate CNI config outside of startkubelet.ps1
 }
 `)
 
@@ -25720,6 +25732,118 @@ func k8sManifestsKubernetesmasterKubeSchedulerYaml() (*asset, error) {
 	return a, nil
 }
 
+<<<<<<< HEAD
+=======
+var _k8sOnRestartPs1 = []byte(`$global:LogPath = "c:\k\on-restart.log"
+$global:HNSModule = "c:\k\hns.psm1"
+
+filter Timestamp { "$(Get-Date -Format o): $_" }
+
+function Write-Log ($message) {
+    $message | Timestamp | Tee-Object -FilePath $global:LogPath -Append
+}
+
+Write-Log "Entering on-restart.ps1"
+
+Import-Module $global:HNSModule
+
+#
+# Stop services
+#
+Write-Log "Stopping kubeproxy service"
+Stop-Service kubeproxy
+
+Write-Log "Stopping kubelet service"
+Stop-Service kubelet
+
+#
+# Perform cleanup
+#
+
+Write-Log "Cleaning up persisted HNS policy lists"
+Get-HnsPolicyList | Remove-HnsPolicyList
+
+$hnsNetwork = Get-HnsNetwork | Where-Object Name -EQ azure
+if ($hnsNetwork){
+    Write-Log "Cleaning up HNS network 'azure'..."
+
+    Write-Log "Cleaning up containers"
+    docker ps -q | ForEach-Object {docker rm $_ -f}
+
+    Write-Log "Removing old HNS network"
+    Remove-HnsNetwork $hnsNetwork
+
+    taskkill /IM azure-vnet.exe /f
+    taskkill /IM azure-vnet-ipam.exe /f
+
+    $cnijson = [io.path]::Combine("c:\k", "azure-vnet-ipam.json")
+    if ((Test-Path $cnijson))
+    {
+        Remove-Item $cnijson
+    }
+
+    $cnilock = [io.path]::Combine("c:\k", "azure-vnet-ipam.json.lock")
+    if ((Test-Path $cnilock))
+    {
+        Remove-Item $cnilock
+    }
+
+    $cnijson = [io.path]::Combine("c:\k", "azure-vnet.json")
+    if ((Test-Path $cnijson))
+    {
+        Remove-Item $cnijson
+    }
+
+    $cnilock = [io.path]::Combine("c:\k", "azure-vnet.json.lock")
+    if ((Test-Path $cnilock))
+    {
+        Remove-Item $cnilock
+    }
+}
+
+$hnsNetwork = Get-HnsNetwork | Where-Object Name -EQ l2bridge
+if ($hnsNetwork)
+{
+    Write-Log "cleaning up HNS network 'l2bridge'"
+
+    Write-Log "cleaning up containers"
+    docker ps -q | ForEach-Object {docker rm $_ -f}
+
+    Write-Log "removing old HNS network"
+    Remove-HnsNetwork $hnsNetwork
+
+    Start-Sleep 10 
+}
+
+# TODO: if network plugin is kubenet create l2bridge network
+
+#
+# Start Services
+#
+Write-Log "Starting kubelet service"
+Start-Service kubelet
+
+Write-Log "Starting kubeproxy service"
+Start-Service kubeproxy
+
+Write-Log "Exiting on-restart.ps1"`)
+
+func k8sOnRestartPs1Bytes() ([]byte, error) {
+	return _k8sOnRestartPs1, nil
+}
+
+func k8sOnRestartPs1() (*asset, error) {
+	bytes, err := k8sOnRestartPs1Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "k8s/on-restart.ps1", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+>>>>>>> WIP generate CNI config outside of startkubelet.ps1
 var _k8sWindowsazurecnifuncPs1 = []byte(`
 
 # TODO: remove - dead code?
@@ -25976,7 +26100,89 @@ function Update-WinCNI
     DownloadFileOverHttp -Url $WinCniUrl -DestinationPath $wincniFile
 }
 
-# TODO: Move the code that creates the wincni configuration file out of windowskubeletfunc.ps1 and put it here`)
+# TODO: Move the code that creates the wincni configuration file out of windowskubeletfunc.ps1 and put it here
+
+function Get-DefaultGateway($CIDR) {
+    return $CIDR.substring(0, $CIDR.lastIndexOf(".")) + ".1"
+}
+
+function Get-PodCIDR() {
+    $podCIDR = c:\k\kubectl.exe --kubeconfig=c:\k\config get nodes/$($env:computername.ToLower()) -o custom-columns=podCidr:.spec.podCIDR --no-headers
+    return $podCIDR
+}
+
+function Test-PodCIDR($podCIDR) {
+    return $podCIDR.length -gt 0
+}
+
+function Update-CNIConfig($podCIDR, $masterSubnetGW) {
+    $jsonSampleConfig =
+    "{
+    ""cniVersion"": ""0.2.0"",
+    ""name"": ""<NetworkMode>"",
+    ""type"": ""win-bridge"",
+    ""master"": ""Ethernet"",
+    ""dns"" : {
+        ""Nameservers"" : [ ""<NameServers>"" ],
+        ""Search"" : [ ""<Cluster DNS Suffix or Search Path>"" ]
+    },
+    ""policies"": [
+    {
+        ""Name"" : ""EndpointPolicy"", ""Value"" : { ""Type"" : ""OutBoundNAT"", ""ExceptionList"": [ ""<ClusterCIDR>"", ""<MgmtSubnet>"" ] }
+    },
+    {
+        ""Name"" : ""EndpointPolicy"", ""Value"" : { ""Type"" : ""ROUTE"", ""DestinationPrefix"": ""<ServiceCIDR>"", ""NeedEncap"" : true }
+    }
+    ]
+}"
+
+    $configJson = ConvertFrom-Json $jsonSampleConfig
+    $configJson.name = $global:NetworkMode.ToLower()
+    $configJson.dns.Nameservers[0] = $global:KubeDnsServiceIp
+    $configJson.dns.Search[0] = $global:KubeDnsSearchPath
+
+    $configJson.policies[0].Value.ExceptionList[0] = $global:KubeClusterCIDR
+    $configJson.policies[0].Value.ExceptionList[1] = $global:MasterSubnet
+    $configJson.policies[1].Value.DestinationPrefix = $global:KubeServiceCIDR
+
+    if (Test-Path $global:CNIConfig) {
+        Clear-Content -Path $global:CNIConfig
+    }
+
+    Write-Host "Generated CNI Config [$configJson]"
+
+    Add-Content -Path $global:CNIConfig -Value (ConvertTo-Json $configJson -Depth 20)
+}
+
+function Write-WinCNIConfig ($kubeletArgList) {
+    $masterSubnetGW = Get-DefaultGateway $global:MasterSubnet
+    $podCIDR = Get-PodCIDR
+    $podCidrDiscovered = Test-PodCIDR($podCIDR)
+
+    # if the podCIDR has not yet been assigned to this node, start the kubelet process to get the podCIDR, and then promptly kill it.
+    if (-not $podCidrDiscovered) {
+        Write-Host "Staring kubelet with args: $kubeletArgList"
+        $process = Start-Process -FilePath c:\k\kubelet.exe -PassThru -ArgumentList $kubeletArgList
+
+        # run kubelet until podCidr is discovered
+        Write-Host "waiting to discover pod CIDR"
+        while (-not $podCidrDiscovered) {
+            Write-Host "Sleeping for 10s, and then waiting to discover pod CIDR"
+            Start-Sleep 10
+
+            $podCIDR = Get-PodCIDR
+            $podCidrDiscovered = Test-PodCIDR($podCIDR)
+        }
+
+        # stop the kubelet process now that we have our CIDR, discard the process output
+        $process | Stop-Process | Out-Null
+    }
+
+    Write-Host "Updating CNI config - PodCIRD: $podCIDR, MasterSubnetGW: $masterSubnetGW"
+    Update-CNIConfig $podCIDR $masterSubnetGW
+}
+
+`)
 
 func k8sWindowscnifuncPs1Bytes() ([]byte, error) {
 	return _k8sWindowscnifuncPs1, nil
@@ -26567,6 +26773,12 @@ Install-KubernetesServices {
         throw "Unknown network type $NetworkPlugin, can't configure kubelet"
     }
 
+    # TODO: move out of this funciton
+    if ($NetworkPlugin -eq "kubenet") {
+        Write-Host "Writing CNI config for kubenet"
+        Write-WinCNIConfig $KubeletArgList
+    }
+
     # Used in WinCNI version of kubeletstart.ps1
     $KubeletArgListStr = ""
     $KubeletArgList | Foreach-Object {
@@ -26751,6 +26963,7 @@ try
 
     Start-Sleep 10
     # Add route to all other POD networks
+    Write-Host "Updating CNI config - PodCIRD: ` + "`" + `$podCIDR, MasterSubnetGW: ` + "`" + `$masterSubnetGW"
     Update-CNIConfig ` + "`" + `$podCIDR ` + "`" + `$masterSubnetGW
 
     $KubeletCommandLine
