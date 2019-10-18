@@ -25028,8 +25028,14 @@ function Retry-Command
 
 function Register-NodeCleanupScriptTask
 {
+
     Write-Log "Creating a startup task to run on-restart.ps1"
-    Copy-Item -Path "c:\AzureData\k8s\windowsnodecleanup.ps1" -Destination "c:\k\windowsnodecleanup.ps1"
+
+    (Get-Content 'c:\AzureData\k8s\windowsnodecleanup.ps1') |
+    Foreach-Object {$_ -replace '{{MasterSubnet}}', $global:MasterSubnet } |
+    Foreach-Object {$_ -replace '{{NetworkPlugin}}', $global:NetworkPlugin } |
+    Out-File 'c:\k\windowsnodecleanup.ps1'
+
     $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-File ` + "`" + `"c:\k\windowsnodecleanup.ps1` + "`" + `""
     $prinical = New-ScheduledTaskPrincipal -UserId SYSTEM -LogonType ServiceAccount -RunLevel Highest
     $trigger = New-JobTrigger -AtStartup -RandomDelay 00:00:05
@@ -26761,11 +26767,13 @@ Install-KubernetesServices {
             -name 'ext'
 
         # try not doing this
+        <#
         Create-WinCNINetwork ` + "`" + `
             -networkMode $NetworkMode ` + "`" + `
             -addressPrefix $podCIDR ` + "`" + `
             -gateway $masterSubnetGW ` + "`" + `
             -name $networkMode.ToLower()
+            #>
     }
 
     # Used in WinCNI version of kubeletstart.ps1
@@ -26835,6 +26843,7 @@ $KubeletCommandLine
         $KubeNetwork = "l2bridge"
         $kubeStartStr += @"
 
+<#
 function
 Get-DefaultGateway(` + "`" + `$CIDR)
 {
@@ -26896,10 +26905,13 @@ Update-CNIConfig(` + "`" + `$podCIDR, ` + "`" + `$masterSubnetGW)
     Add-Content -Path ` + "`" + `$global:CNIConfig -Value (ConvertTo-Json ` + "`" + `$configJson -Depth 20)
 }
 
+#>
+
 try
 {
     ` + "`" + `$env:AZURE_ENVIRONMENT_FILEPATH="c:\k\azurestackcloud.json"
 
+<#
     ` + "`" + `$masterSubnetGW = Get-DefaultGateway ` + "`" + `$global:MasterSubnet
     ` + "`" + `$podCIDR=Get-PodCIDR
     ` + "`" + `$podCidrDiscovered=Test-PodCIDR(` + "`" + `$podCIDR)
@@ -26925,10 +26937,12 @@ try
         # stop the kubelet process now that we have our CIDR, discard the process output
         ` + "`" + `$process | Stop-Process | Out-Null
     }
+    #>
 
     # Turn off Firewall to enable pods to talk to service endpoints. (Kubelet should eventually do this)
     netsh advfirewall set allprofiles state off
-
+    
+    <#
     # startup the service
     ` + "`" + `$hnsNetwork = Get-HnsNetwork | ? Name -EQ ` + "`" + `$global:NetworkMode.ToLower()
 
@@ -26954,7 +26968,7 @@ try
     # Add route to all other POD networks
     Write-Host "Updating CNI config - PodCIRD: ` + "`" + `$podCIDR, MasterSubnetGW: ` + "`" + `$masterSubnetGW"
     Update-CNIConfig ` + "`" + `$podCIDR ` + "`" + `$masterSubnetGW
-
+#>
     $KubeletCommandLine
 }
 catch
@@ -26985,11 +26999,9 @@ $KubeDir\kube-proxy.exe --v=3 --proxy-mode=kernelspace --hostname-override=$env:
 
     $kubeProxyStartStr | Out-File -encoding ASCII -filepath $KubeProxyStartFile
 
-<#
     New-NSSMService -KubeDir $KubeDir ` + "`" + `
         -KubeletStartFile $KubeletStartFile ` + "`" + `
         -KubeProxyStartFile $KubeProxyStartFile
-#>
 }
 `)
 
@@ -27011,10 +27023,23 @@ func k8sWindowskubeletfuncPs1() (*asset, error) {
 var _k8sWindowsnodecleanupPs1 = []byte(`$global:LogPath = "c:\k\windowsnodecleanup.log"
 $global:HNSModule = "c:\k\hns.psm1"
 
+$global:MasterSubnet = "{{MasterSubnet}}"
+$global:NetworkMode = "L2Bridge"
+$global:NetworkPlugin = "{{NetworkPlugin}}"
+
 filter Timestamp { "$(Get-Date -Format o): $_" }
 
 function Write-Log ($message) {
     $message | Timestamp | Tee-Object -FilePath $global:LogPath -Append
+}
+
+function Get-DefaultGateway($CIDR) {
+    return $CIDR.substring(0, $CIDR.lastIndexOf(".")) + ".1"
+}
+
+function Get-PodCIDR() {
+    $podCIDR = c:\k\kubectl.exe --kubeconfig=c:\k\config get nodes/$($env:computername.ToLower()) -o custom-columns=podCidr:.spec.podCIDR --no-headers
+    return $podCIDR
 }
 
 Write-Log "Entering windowsnodecleanup.ps1"
@@ -27075,10 +27100,16 @@ if ($hnsNetwork) {
     Write-Log "removing old HNS network"
     Remove-HnsNetwork $hnsNetwork
 
-    Start-Sleep 10 
+    Start-Sleep 10
 }
 
-# TODO: if network plugin is kubenet create l2bridge network
+if ($global:NetworkPlugin -eq 'kubenet') {
+    Write-Log "Creating new hns network: $($global:NetworkMode.ToLower())"
+    $podCIDR = Get-PodCIDR
+    $masterSubnetGW = Get-DefaultGateway $global:MasterSubnet
+    New-HNSNetwork -Type $global:NetworkMode -AddressPrefix $podCIDR -Gateway $masterSubnetGW -Name $global:NetworkMode.ToLower() -Verbose
+    Start-sleep 10
+}
 
 #
 # Start Services

@@ -394,11 +394,13 @@ Install-KubernetesServices {
             -name 'ext'
 
         # try not doing this
+        <#
         Create-WinCNINetwork `
             -networkMode $NetworkMode `
             -addressPrefix $podCIDR `
             -gateway $masterSubnetGW `
             -name $networkMode.ToLower()
+            #>
     }
 
     # Used in WinCNI version of kubeletstart.ps1
@@ -468,6 +470,7 @@ $KubeletCommandLine
         $KubeNetwork = "l2bridge"
         $kubeStartStr += @"
 
+<#
 function
 Get-DefaultGateway(`$CIDR)
 {
@@ -529,10 +532,13 @@ Update-CNIConfig(`$podCIDR, `$masterSubnetGW)
     Add-Content -Path `$global:CNIConfig -Value (ConvertTo-Json `$configJson -Depth 20)
 }
 
+#>
+
 try
 {
     `$env:AZURE_ENVIRONMENT_FILEPATH="c:\k\azurestackcloud.json"
 
+<#
     `$masterSubnetGW = Get-DefaultGateway `$global:MasterSubnet
     `$podCIDR=Get-PodCIDR
     `$podCidrDiscovered=Test-PodCIDR(`$podCIDR)
@@ -558,10 +564,12 @@ try
         # stop the kubelet process now that we have our CIDR, discard the process output
         `$process | Stop-Process | Out-Null
     }
+    #>
 
     # Turn off Firewall to enable pods to talk to service endpoints. (Kubelet should eventually do this)
     netsh advfirewall set allprofiles state off
-
+    
+    <#
     # startup the service
     `$hnsNetwork = Get-HnsNetwork | ? Name -EQ `$global:NetworkMode.ToLower()
 
@@ -587,7 +595,7 @@ try
     # Add route to all other POD networks
     Write-Host "Updating CNI config - PodCIRD: `$podCIDR, MasterSubnetGW: `$masterSubnetGW"
     Update-CNIConfig `$podCIDR `$masterSubnetGW
-
+#>
     $KubeletCommandLine
 }
 catch
@@ -618,9 +626,7 @@ $KubeDir\kube-proxy.exe --v=3 --proxy-mode=kernelspace --hostname-override=$env:
 
     $kubeProxyStartStr | Out-File -encoding ASCII -filepath $KubeProxyStartFile
 
-<#
     New-NSSMService -KubeDir $KubeDir `
         -KubeletStartFile $KubeletStartFile `
         -KubeProxyStartFile $KubeProxyStartFile
-#>
 }
