@@ -368,41 +368,6 @@ Install-KubernetesServices {
         throw "Unknown network type $NetworkPlugin, can't configure kubelet"
     }
 
-    # TODO: move out of this funciton
-    if ($NetworkPlugin -eq "kubenet") {
-
-        Write-Log "Performing kubenet one-time setup"
-
-        $podCIDR = Get-PodCIDRForNode -kubeletArgList $KubeletArgList
-        $masterSubnetGW = Get-DefaultGateway $MasterSubnet
-
-        Write-WinCNIConfig `
-        -cniConfigPath "c:\k\cni\config\$($NetworkMode).conf" `
-        -networkMode $NetworkMode `
-        -kubeDnsServiceIp $KubeDnsServiceIp `
-        -kubeDnsSearchPath 'svc.cluster.local' `
-        -kubeClusterCIDR $KubeClusterCIDR `
-        -masterSubnet $MasterSubnet `
-        -kubeServiceCIDR $KubeServiceCIDR
-
-        Import-Module $HNSModule
-
-        Create-WinCNINetwork `
-            -networkMode $NetworkMode `
-            -addressPrefix "192.168.255.0/30" `
-            -gateway "192.168.255.1" `
-            -name 'ext'
-
-        # try not doing this
-        <#
-        Create-WinCNINetwork `
-            -networkMode $NetworkMode `
-            -addressPrefix $podCIDR `
-            -gateway $masterSubnetGW `
-            -name $networkMode.ToLower()
-            #>
-    }
-
     # Used in WinCNI version of kubeletstart.ps1
     $KubeletArgListStr = ""
     $KubeletArgList | Foreach-Object {
@@ -435,26 +400,12 @@ Install-KubernetesServices {
 `$global:KubeletNodeLabels="$KubeletNodeLabels"
 
 "@
-
     if ($NetworkPlugin -eq "azure") {
         $KubeNetwork = "azure"
         $kubeStartStr += @"
 Write-Host "NetworkPlugin azure, starting kubelet."
 
-# Turn off Firewall to enable pods to talk to service endpoints. (Kubelet should eventually do this)
-netsh advfirewall set allprofiles state off
 # startup the service
-
-# Find if the primary external switch network exists. If not create one.
-# This is done only once in the lifetime of the node
-`$hnsNetwork = Get-HnsNetwork | ? Name -EQ `$global:ExternalNetwork
-if (!`$hnsNetwork)
-{
-    Write-Host "Creating a new hns Network"
-    ipmo `$global:HNSModule
-    # Fixme : use a smallest range possible, that will not collide with any pod space
-    New-HNSNetwork -Type `$global:NetworkMode -AddressPrefix "192.168.255.0/30" -Gateway "192.168.255.1" -Name `$global:ExternalNetwork -Verbose
-}
 
 # Restart Kubeproxy, which would wait, until the network is created
 Restart-Service Kubeproxy
@@ -470,132 +421,10 @@ $KubeletCommandLine
         $KubeNetwork = "l2bridge"
         $kubeStartStr += @"
 
-<#
-function
-Get-DefaultGateway(`$CIDR)
-{
-    return `$CIDR.substring(0,`$CIDR.lastIndexOf(".")) + ".1"
-}
-
-function
-Get-PodCIDR()
-{
-    `$podCIDR = c:\k\kubectl.exe --kubeconfig=c:\k\config get nodes/`$(`$env:computername.ToLower()) -o custom-columns=podCidr:.spec.podCIDR --no-headers
-    return `$podCIDR
-}
-
-function
-Test-PodCIDR(`$podCIDR)
-{
-    return `$podCIDR.length -gt 0
-}
-
-function
-Update-CNIConfig(`$podCIDR, `$masterSubnetGW)
-{
-    `$jsonSampleConfig =
-"{
-    ""cniVersion"": ""0.2.0"",
-    ""name"": ""<NetworkMode>"",
-    ""type"": ""win-bridge"",
-    ""master"": ""Ethernet"",
-    ""dns"" : {
-        ""Nameservers"" : [ ""<NameServers>"" ],
-        ""Search"" : [ ""<Cluster DNS Suffix or Search Path>"" ]
-    },
-    ""policies"": [
-    {
-        ""Name"" : ""EndpointPolicy"", ""Value"" : { ""Type"" : ""OutBoundNAT"", ""ExceptionList"": [ ""<ClusterCIDR>"", ""<MgmtSubnet>"" ] }
-    },
-    {
-        ""Name"" : ""EndpointPolicy"", ""Value"" : { ""Type"" : ""ROUTE"", ""DestinationPrefix"": ""<ServiceCIDR>"", ""NeedEncap"" : true }
-    }
-    ]
-}"
-
-    `$configJson = ConvertFrom-Json `$jsonSampleConfig
-    `$configJson.name = `$global:NetworkMode.ToLower()
-    `$configJson.dns.Nameservers[0] = `$global:KubeDnsServiceIp
-    `$configJson.dns.Search[0] = `$global:KubeDnsSearchPath
-
-    `$configJson.policies[0].Value.ExceptionList[0] = `$global:KubeClusterCIDR
-    `$configJson.policies[0].Value.ExceptionList[1] = `$global:MasterSubnet
-    `$configJson.policies[1].Value.DestinationPrefix  = `$global:KubeServiceCIDR
-
-    if (Test-Path `$global:CNIConfig)
-    {
-        Clear-Content -Path `$global:CNIConfig
-    }
-
-    Write-Host "Generated CNI Config [`$configJson]"
-
-    Add-Content -Path `$global:CNIConfig -Value (ConvertTo-Json `$configJson -Depth 20)
-}
-
-#>
-
 try
 {
     `$env:AZURE_ENVIRONMENT_FILEPATH="c:\k\azurestackcloud.json"
 
-<#
-    `$masterSubnetGW = Get-DefaultGateway `$global:MasterSubnet
-    `$podCIDR=Get-PodCIDR
-    `$podCidrDiscovered=Test-PodCIDR(`$podCIDR)
-
-    # if the podCIDR has not yet been assigned to this node, start the kubelet process to get the podCIDR, and then promptly kill it.
-    if (-not `$podCidrDiscovered)
-    {
-        `$argList = $KubeletArgListStr
-
-        `$process = Start-Process -FilePath c:\k\kubelet.exe -PassThru -ArgumentList `$argList
-
-        # run kubelet until podCidr is discovered
-        Write-Host "waiting to discover pod CIDR"
-        while (-not `$podCidrDiscovered)
-        {
-            Write-Host "Sleeping for 10s, and then waiting to discover pod CIDR"
-            Start-Sleep 10
-
-            `$podCIDR=Get-PodCIDR
-            `$podCidrDiscovered=Test-PodCIDR(`$podCIDR)
-        }
-
-        # stop the kubelet process now that we have our CIDR, discard the process output
-        `$process | Stop-Process | Out-Null
-    }
-    #>
-
-    # Turn off Firewall to enable pods to talk to service endpoints. (Kubelet should eventually do this)
-    netsh advfirewall set allprofiles state off
-    
-    <#
-    # startup the service
-    `$hnsNetwork = Get-HnsNetwork | ? Name -EQ `$global:NetworkMode.ToLower()
-
-    if (`$hnsNetwork)
-    {
-        # Kubelet has been restarted with existing network.
-        # Cleanup all containers
-        docker ps -q | foreach {docker rm `$_ -f}
-        # cleanup network
-        Write-Host "Cleaning up old HNS network found"
-        Remove-HnsNetwork `$hnsNetwork
-        Start-Sleep 10
-    }
-
-    Write-Host "Creating a new hns Network"
-    ipmo `$global:HNSModule
-
-    `$hnsNetwork = New-HNSNetwork -Type `$global:NetworkMode -AddressPrefix `$podCIDR -Gateway `$masterSubnetGW -Name `$global:NetworkMode.ToLower() -Verbose
-    # New network has been created, Kubeproxy service has to be restarted
-    Restart-Service Kubeproxy
-
-    Start-Sleep 10
-    # Add route to all other POD networks
-    Write-Host "Updating CNI config - PodCIRD: `$podCIDR, MasterSubnetGW: `$masterSubnetGW"
-    Update-CNIConfig `$podCIDR `$masterSubnetGW
-#>
     $KubeletCommandLine
 }
 catch

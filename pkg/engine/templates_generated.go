@@ -162,7 +162,6 @@
 // ../../parts/k8s/manifests/kubernetesmaster-kube-scheduler.yaml
 // ../../parts/k8s/windowsazurecnifunc.ps1
 // ../../parts/k8s/windowscnifunc.ps1
-// ../../parts/k8s/windowscnifunc.tests.ps1
 // ../../parts/k8s/windowsconfigfunc.ps1
 // ../../parts/k8s/windowsinstallopensshfunc.ps1
 // ../../parts/k8s/windowskubeletfunc.ps1
@@ -25301,6 +25300,10 @@ try
 
         Write-Log "Configuring networking with NetworkPlugin:$global:NetworkPlugin"
 
+        Write-Log "Disable Filewall to enable pods to talk to service endpoints"
+        # Kubelet should eventually do this)
+        netsh advfirewall set allprofiles state off
+
         # Configure network policy.
         if ($global:NetworkPlugin -eq "azure") {
             Write-Log "Installing Azure VNet plugins"
@@ -25325,14 +25328,29 @@ try
                     -AADClientSecret $([System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($AADClientSecret))) ` + "`" + `
                     -NetworkAPIVersion $NetworkAPIVersion ` + "`" + `
                     -AzureEnvironmentFilePath $([io.path]::Combine($global:KubeDir, "azurestackcloud.json")) ` + "`" + `
-                    -IdentitySystem "{{ GetIdentitySystem }}"                    
+                    -IdentitySystem "{{ GetIdentitySystem }}"
             }
-
         } elseif ($global:NetworkPlugin -eq "kubenet") {
             Write-Log "Fetching additional files needed for kubenet"
             Update-WinCNI -CNIPath $global:CNIPath
-            Get-HnsPsm1 -HNSModule $global:HNSModule
+
+            Write-Log "Creating WinCNI network config file"
+            Write-WinCNIConfig ` + "`" + `
+                -cniConfigPath "c:\k\cni\config\$($NetworkMode).conf" ` + "`" + `
+                -networkMode $global:NetworkMode ` + "`" + `
+                -kubeDnsServiceIp $KubeDnsServiceIp ` + "`" + `
+                -kubeDnsSearchPath "svc.cluster.local" ` + "`" + `
+                -kubeClusterCIDR $KubeClusterCIDR ` + "`" + `
+                -masterSubnet $global:MasterSubnet ` + "`" + `
+                -kubeServiceCIDR $global:KubeServiceCIDR
         }
+
+        Write-Log "Creating ext HNS network"
+        # This is done so network connectivity to the node is not lost when other networks are added/removed
+        Get-HnsPsm1 -HNSModule $global:HNSModule
+        Import-Module $global:HNSModule
+        # Fixme : use a smallest range possible, that will not collide with any pod space
+        New-HNSNetwork -Type $global:NetworkMode -AddressPrefix "192.168.255.0/30" -Gateway "192.168.255.1" -Name "ext" -Verbose
 
         Write-Log "Write kubelet startfile with pod CIDR of $podCIDR"
         Install-KubernetesServices ` + "`" + `
@@ -26113,60 +26131,6 @@ func k8sWindowscnifuncPs1() (*asset, error) {
 	return a, nil
 }
 
-var _k8sWindowscnifuncTestsPs1 = []byte(`. $PSScriptRoot\kuberneteswindowsfunctions.ps1
-. $PSScriptRoot\windowscnifunc.ps1
-
-Describe 'Write-WinCNIConfig' {
-    $path ="TestDrive:\net.conf"
-
-    Write-WinCNIConfig ` + "`" + `
-        -cniConfigPath = $path ` + "`" + `
-        -networkMode = "L2Bridge" ` + "`" + `
-        -kubeDnsServiceIp = "10.0.0.10" ` + "`" + `
-        -kubeDnsSearchPath = "svc.cluster.local" ` + "`" + `
-        -kubeClusterCIDR = "10.244.0.0/16" ` + "`" + `
-        -kubeServiceCIDR = "10.0.0.0/16" ` + "`" + `
-        -masterSubnet = "10.240.0.0/16"
-
-    $content = Get-Content $path
-    Write-Host $content
-
-    It "config file created" {
-        (Test-Path $path) | Should Be $true
-    }
-
-}
-
-function Add-Footer($path, $footer) {
-    Add-Content $path -Value $footer
-}
-
-Describe "Add-Footer" {
-    $testPath = "TestDrive:\test.txt"
-    Set-Content $testPath -value "my test text."
-    Add-Footer $testPath "-Footer"
-    $result = Get-Content $testPath
-
-    It "adds a footer" {
-        (-join $result) | Should Be "my test text.-Footer"
-    }
-}`)
-
-func k8sWindowscnifuncTestsPs1Bytes() ([]byte, error) {
-	return _k8sWindowscnifuncTestsPs1, nil
-}
-
-func k8sWindowscnifuncTestsPs1() (*asset, error) {
-	bytes, err := k8sWindowscnifuncTestsPs1Bytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "k8s/windowscnifunc.tests.ps1", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
 var _k8sWindowsconfigfuncPs1 = []byte(`
 
 # Set the service telemetry GUID. This is used with Windows Analytics https://docs.microsoft.com/en-us/sccm/core/clients/manage/monitor-windows-analytics
@@ -26741,41 +26705,6 @@ Install-KubernetesServices {
         throw "Unknown network type $NetworkPlugin, can't configure kubelet"
     }
 
-    # TODO: move out of this funciton
-    if ($NetworkPlugin -eq "kubenet") {
-
-        Write-Log "Performing kubenet one-time setup"
-
-        $podCIDR = Get-PodCIDRForNode -kubeletArgList $KubeletArgList
-        $masterSubnetGW = Get-DefaultGateway $MasterSubnet
-
-        Write-WinCNIConfig ` + "`" + `
-        -cniConfigPath "c:\k\cni\config\$($NetworkMode).conf" ` + "`" + `
-        -networkMode $NetworkMode ` + "`" + `
-        -kubeDnsServiceIp $KubeDnsServiceIp ` + "`" + `
-        -kubeDnsSearchPath 'svc.cluster.local' ` + "`" + `
-        -kubeClusterCIDR $KubeClusterCIDR ` + "`" + `
-        -masterSubnet $MasterSubnet ` + "`" + `
-        -kubeServiceCIDR $KubeServiceCIDR
-
-        Import-Module $HNSModule
-
-        Create-WinCNINetwork ` + "`" + `
-            -networkMode $NetworkMode ` + "`" + `
-            -addressPrefix "192.168.255.0/30" ` + "`" + `
-            -gateway "192.168.255.1" ` + "`" + `
-            -name 'ext'
-
-        # try not doing this
-        <#
-        Create-WinCNINetwork ` + "`" + `
-            -networkMode $NetworkMode ` + "`" + `
-            -addressPrefix $podCIDR ` + "`" + `
-            -gateway $masterSubnetGW ` + "`" + `
-            -name $networkMode.ToLower()
-            #>
-    }
-
     # Used in WinCNI version of kubeletstart.ps1
     $KubeletArgListStr = ""
     $KubeletArgList | Foreach-Object {
@@ -26808,26 +26737,12 @@ Install-KubernetesServices {
 ` + "`" + `$global:KubeletNodeLabels="$KubeletNodeLabels"
 
 "@
-
     if ($NetworkPlugin -eq "azure") {
         $KubeNetwork = "azure"
         $kubeStartStr += @"
 Write-Host "NetworkPlugin azure, starting kubelet."
 
-# Turn off Firewall to enable pods to talk to service endpoints. (Kubelet should eventually do this)
-netsh advfirewall set allprofiles state off
 # startup the service
-
-# Find if the primary external switch network exists. If not create one.
-# This is done only once in the lifetime of the node
-` + "`" + `$hnsNetwork = Get-HnsNetwork | ? Name -EQ ` + "`" + `$global:ExternalNetwork
-if (!` + "`" + `$hnsNetwork)
-{
-    Write-Host "Creating a new hns Network"
-    ipmo ` + "`" + `$global:HNSModule
-    # Fixme : use a smallest range possible, that will not collide with any pod space
-    New-HNSNetwork -Type ` + "`" + `$global:NetworkMode -AddressPrefix "192.168.255.0/30" -Gateway "192.168.255.1" -Name ` + "`" + `$global:ExternalNetwork -Verbose
-}
 
 # Restart Kubeproxy, which would wait, until the network is created
 Restart-Service Kubeproxy
@@ -26843,132 +26758,10 @@ $KubeletCommandLine
         $KubeNetwork = "l2bridge"
         $kubeStartStr += @"
 
-<#
-function
-Get-DefaultGateway(` + "`" + `$CIDR)
-{
-    return ` + "`" + `$CIDR.substring(0,` + "`" + `$CIDR.lastIndexOf(".")) + ".1"
-}
-
-function
-Get-PodCIDR()
-{
-    ` + "`" + `$podCIDR = c:\k\kubectl.exe --kubeconfig=c:\k\config get nodes/` + "`" + `$(` + "`" + `$env:computername.ToLower()) -o custom-columns=podCidr:.spec.podCIDR --no-headers
-    return ` + "`" + `$podCIDR
-}
-
-function
-Test-PodCIDR(` + "`" + `$podCIDR)
-{
-    return ` + "`" + `$podCIDR.length -gt 0
-}
-
-function
-Update-CNIConfig(` + "`" + `$podCIDR, ` + "`" + `$masterSubnetGW)
-{
-    ` + "`" + `$jsonSampleConfig =
-"{
-    ""cniVersion"": ""0.2.0"",
-    ""name"": ""<NetworkMode>"",
-    ""type"": ""win-bridge"",
-    ""master"": ""Ethernet"",
-    ""dns"" : {
-        ""Nameservers"" : [ ""<NameServers>"" ],
-        ""Search"" : [ ""<Cluster DNS Suffix or Search Path>"" ]
-    },
-    ""policies"": [
-    {
-        ""Name"" : ""EndpointPolicy"", ""Value"" : { ""Type"" : ""OutBoundNAT"", ""ExceptionList"": [ ""<ClusterCIDR>"", ""<MgmtSubnet>"" ] }
-    },
-    {
-        ""Name"" : ""EndpointPolicy"", ""Value"" : { ""Type"" : ""ROUTE"", ""DestinationPrefix"": ""<ServiceCIDR>"", ""NeedEncap"" : true }
-    }
-    ]
-}"
-
-    ` + "`" + `$configJson = ConvertFrom-Json ` + "`" + `$jsonSampleConfig
-    ` + "`" + `$configJson.name = ` + "`" + `$global:NetworkMode.ToLower()
-    ` + "`" + `$configJson.dns.Nameservers[0] = ` + "`" + `$global:KubeDnsServiceIp
-    ` + "`" + `$configJson.dns.Search[0] = ` + "`" + `$global:KubeDnsSearchPath
-
-    ` + "`" + `$configJson.policies[0].Value.ExceptionList[0] = ` + "`" + `$global:KubeClusterCIDR
-    ` + "`" + `$configJson.policies[0].Value.ExceptionList[1] = ` + "`" + `$global:MasterSubnet
-    ` + "`" + `$configJson.policies[1].Value.DestinationPrefix  = ` + "`" + `$global:KubeServiceCIDR
-
-    if (Test-Path ` + "`" + `$global:CNIConfig)
-    {
-        Clear-Content -Path ` + "`" + `$global:CNIConfig
-    }
-
-    Write-Host "Generated CNI Config [` + "`" + `$configJson]"
-
-    Add-Content -Path ` + "`" + `$global:CNIConfig -Value (ConvertTo-Json ` + "`" + `$configJson -Depth 20)
-}
-
-#>
-
 try
 {
     ` + "`" + `$env:AZURE_ENVIRONMENT_FILEPATH="c:\k\azurestackcloud.json"
 
-<#
-    ` + "`" + `$masterSubnetGW = Get-DefaultGateway ` + "`" + `$global:MasterSubnet
-    ` + "`" + `$podCIDR=Get-PodCIDR
-    ` + "`" + `$podCidrDiscovered=Test-PodCIDR(` + "`" + `$podCIDR)
-
-    # if the podCIDR has not yet been assigned to this node, start the kubelet process to get the podCIDR, and then promptly kill it.
-    if (-not ` + "`" + `$podCidrDiscovered)
-    {
-        ` + "`" + `$argList = $KubeletArgListStr
-
-        ` + "`" + `$process = Start-Process -FilePath c:\k\kubelet.exe -PassThru -ArgumentList ` + "`" + `$argList
-
-        # run kubelet until podCidr is discovered
-        Write-Host "waiting to discover pod CIDR"
-        while (-not ` + "`" + `$podCidrDiscovered)
-        {
-            Write-Host "Sleeping for 10s, and then waiting to discover pod CIDR"
-            Start-Sleep 10
-
-            ` + "`" + `$podCIDR=Get-PodCIDR
-            ` + "`" + `$podCidrDiscovered=Test-PodCIDR(` + "`" + `$podCIDR)
-        }
-
-        # stop the kubelet process now that we have our CIDR, discard the process output
-        ` + "`" + `$process | Stop-Process | Out-Null
-    }
-    #>
-
-    # Turn off Firewall to enable pods to talk to service endpoints. (Kubelet should eventually do this)
-    netsh advfirewall set allprofiles state off
-    
-    <#
-    # startup the service
-    ` + "`" + `$hnsNetwork = Get-HnsNetwork | ? Name -EQ ` + "`" + `$global:NetworkMode.ToLower()
-
-    if (` + "`" + `$hnsNetwork)
-    {
-        # Kubelet has been restarted with existing network.
-        # Cleanup all containers
-        docker ps -q | foreach {docker rm ` + "`" + `$_ -f}
-        # cleanup network
-        Write-Host "Cleaning up old HNS network found"
-        Remove-HnsNetwork ` + "`" + `$hnsNetwork
-        Start-Sleep 10
-    }
-
-    Write-Host "Creating a new hns Network"
-    ipmo ` + "`" + `$global:HNSModule
-
-    ` + "`" + `$hnsNetwork = New-HNSNetwork -Type ` + "`" + `$global:NetworkMode -AddressPrefix ` + "`" + `$podCIDR -Gateway ` + "`" + `$masterSubnetGW -Name ` + "`" + `$global:NetworkMode.ToLower() -Verbose
-    # New network has been created, Kubeproxy service has to be restarted
-    Restart-Service Kubeproxy
-
-    Start-Sleep 10
-    # Add route to all other POD networks
-    Write-Host "Updating CNI config - PodCIRD: ` + "`" + `$podCIDR, MasterSubnetGW: ` + "`" + `$masterSubnetGW"
-    Update-CNIConfig ` + "`" + `$podCIDR ` + "`" + `$masterSubnetGW
-#>
     $KubeletCommandLine
 }
 catch
@@ -27020,7 +26813,13 @@ func k8sWindowskubeletfuncPs1() (*asset, error) {
 	return a, nil
 }
 
-var _k8sWindowsnodecleanupPs1 = []byte(`$global:LogPath = "c:\k\windowsnodecleanup.log"
+var _k8sWindowsnodecleanupPs1 = []byte(`<#
+.DESCRIPTION
+    This script is intended to be run each time a windows nodes is restarted and performs
+    cleanup actions to help ensure the node comes up cleanly.
+#>
+
+$global:LogPath = "c:\k\windowsnodecleanup.log"
 $global:HNSModule = "c:\k\hns.psm1"
 
 $global:MasterSubnet = "{{MasterSubnet}}"
@@ -27037,6 +26836,9 @@ function Get-DefaultGateway($CIDR) {
     return $CIDR.substring(0, $CIDR.lastIndexOf(".")) + ".1"
 }
 
+# Note: this is needed for creating the l2bridge network for kubenet.
+# This requires that the kubelet has been started at least once to get data from the control plane.
+# This is currently done as part of the initial set up CSE.
 function Get-PodCIDR() {
     $podCIDR = c:\k\kubectl.exe --kubeconfig=c:\k\config get nodes/$($env:computername.ToLower()) -o custom-columns=podCidr:.spec.podCIDR --no-headers
     return $podCIDR
@@ -27102,6 +26904,10 @@ if ($hnsNetwork) {
 
     Start-Sleep 10
 }
+
+#
+# Create required networks
+#
 
 if ($global:NetworkPlugin -eq 'kubenet') {
     Write-Log "Creating new hns network: $($global:NetworkMode.ToLower())"
@@ -30702,7 +30508,6 @@ var _bindata = map[string]func() (*asset, error){
 	"k8s/manifests/kubernetesmaster-kube-scheduler.yaml":                 k8sManifestsKubernetesmasterKubeSchedulerYaml,
 	"k8s/windowsazurecnifunc.ps1":                                        k8sWindowsazurecnifuncPs1,
 	"k8s/windowscnifunc.ps1":                                             k8sWindowscnifuncPs1,
-	"k8s/windowscnifunc.tests.ps1":                                       k8sWindowscnifuncTestsPs1,
 	"k8s/windowsconfigfunc.ps1":                                          k8sWindowsconfigfuncPs1,
 	"k8s/windowsinstallopensshfunc.ps1":                                  k8sWindowsinstallopensshfuncPs1,
 	"k8s/windowskubeletfunc.ps1":                                         k8sWindowskubeletfuncPs1,
@@ -30979,7 +30784,6 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		}},
 		"windowsazurecnifunc.ps1":       {k8sWindowsazurecnifuncPs1, map[string]*bintree{}},
 		"windowscnifunc.ps1":            {k8sWindowscnifuncPs1, map[string]*bintree{}},
-		"windowscnifunc.tests.ps1":      {k8sWindowscnifuncTestsPs1, map[string]*bintree{}},
 		"windowsconfigfunc.ps1":         {k8sWindowsconfigfuncPs1, map[string]*bintree{}},
 		"windowsinstallopensshfunc.ps1": {k8sWindowsinstallopensshfuncPs1, map[string]*bintree{}},
 		"windowskubeletfunc.ps1":        {k8sWindowskubeletfuncPs1, map[string]*bintree{}},
