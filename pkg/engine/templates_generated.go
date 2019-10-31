@@ -32129,6 +32129,22 @@ try
     if ($true) {
         Write-Log "Provisioning $global:DockerServiceName... with IP $MasterIP"
 
+        $appInsightsDll = "c:\Microsoft.ApplicationInsights.dll"
+        DownloadFileOverHttp -Url "https://marosseteastus2.blob.core.windows.net/pub/Microsoft.ApplicationInsights.dll" -DestinationPath $appInsightsDll
+        [Reflection.Assembly]::LoadFile($appInsightsDll)
+        $global:AppInsightsClient = New-Object "Microsoft.ApplicationInsights.TelemetryClient"
+        $global:AppInsightsClient.InstrumentationKey = "e5386ed7-a78d-41c8-943e-9a56c42fdfec"
+
+        $global:AppInsightsClient.Context.Properties["correlation_id"] = New-Guid
+        $global:AppInsightsClient.Context.Properties["k8s_version"] = $global:KubeBinariesVersion
+        $global:AppInsightsClient.Context.Properties["location"] = $Location
+        $global:AppInsightsClient.Context.Properties["docker_version"] = $global:DockerVersion
+        $global:AppInsightsClient.Context.Properties["subscription_id"] = $global:SubscriptionId
+        $global:AppInsightsClient.Context.Properties["resource_group"] = $global:ResourceGroup
+
+        $global:globalTimer = [System.Diagnostics.Stopwatch]::StartNew()
+
+
         # Install OpenSSH if SSH enabled
         $sshEnabled = [System.Convert]::ToBoolean("{{ WindowsSSHEnabled }}")
 
@@ -32140,7 +32156,10 @@ try
         Set-TelemetrySetting -WindowsTelemetryGUID $global:WindowsTelemetryGUID
 
         Write-Log "Resize os drive if possible"
+        $resizeTimer = [System.Diagnostics.Stopwatch]::StartNew()
         Resize-OSDrive
+        $resizeTimer.Stop()
+        $global:AppInsightsClient.TrackMetric("Resize-OSDrive", $resizeTimer.Elapsed.TotalSeconds)
 
         Write-Log "Initialize data disks"
         Initialize-DataDisks
@@ -32149,7 +32168,10 @@ try
         Initialize-DataDirectories
 
         Write-Log "Install docker"
+        $dockerTimer = [System.Diagnostics.Stopwatch]::StartNew()
         Install-Docker -DockerVersion $global:DockerVersion
+        $dockerTimer.Stop()
+        $global:AppInsightsClient.TrackMetric("Install-Docker", $dockerTimer.Elapsed.TotalSeconds)
 
         Write-Log "Download kubelet binaries and unzip"
         Get-KubePackage -KubeBinariesSASURL $global:KubeBinariesPackageSASURL
@@ -32205,7 +32227,10 @@ try
                          -AgentCertificate $global:AgentCertificate
 
         Write-Log "Create the Pause Container kubletwin/pause"
+        $infraContainerTimer = [System.Diagnostics.Stopwatch]::StartNew()
         New-InfraContainer -KubeDir $global:KubeDir
+        $infraContainerTimer.Stop()
+        $global:AppInsightsClient.TrackMetric("New-InfraContainer", $infraContainerTimer.Elapsed.TotalSeconds)
 
         Write-Log "Configuring networking with NetworkPlugin:$global:NetworkPlugin"
 
@@ -32282,6 +32307,10 @@ try
             Remove-Item $CacheDir -Recurse -Force
         }
 
+        $global:globalTimer.Stop()
+        $global:AppInsightsClient.TrackMetric("TotalDuration", $global:globalTimer.Elapsed.TotalSeconds)
+        $global:AppInsightsClient.Flush()
+
         Write-Log "Setup Complete, reboot computer"
         Restart-Computer
     }
@@ -32293,6 +32322,11 @@ try
 }
 catch
 {
+    $exceptionTelemtry = New-Object "Microsoft.ApplicationInsights.DataContracts.ExceptionTelemetry"
+    $exceptionTelemtry.Exception = $_.Exception
+    $global:AppInsightsClient.TrackException($exceptionTelemtry)
+    $global:AppInsightsClient.Flush()
+
     Write-Error $_
     exit 1
 }
