@@ -161,6 +161,8 @@ try
     if ($true) {
         Write-Log "Provisioning $global:DockerServiceName... with IP $MasterIP"
 
+        $isAksVhd = Test-Path "c:\release-notes.txt"
+
         $appInsightsDll = "c:\Microsoft.ApplicationInsights.dll"
         DownloadFileOverHttp -Url "https://marosseteastus2.blob.core.windows.net/pub/Microsoft.ApplicationInsights.dll" -DestinationPath $appInsightsDll
         [Reflection.Assembly]::LoadFile($appInsightsDll)
@@ -173,6 +175,7 @@ try
         $global:AppInsightsClient.Context.Properties["docker_version"] = $global:DockerVersion
         $global:AppInsightsClient.Context.Properties["subscription_id"] = $global:SubscriptionId
         $global:AppInsightsClient.Context.Properties["resource_group"] = $global:ResourceGroup
+        $global:AppInsightsClient.Context.Properties["is_aks_vhd"] = $isAksVhd
 
         $global:globalTimer = [System.Diagnostics.Stopwatch]::StartNew()
 
@@ -181,7 +184,10 @@ try
         $sshEnabled = [System.Convert]::ToBoolean("{{ WindowsSSHEnabled }}")
 
         if ( $sshEnabled ) {
+            $sshTimer = [System.Diagnostics.Stopwatch]::StartNew()
             Install-OpenSSH -SSHKeys $SSHKeys
+            $sshTimer.Stop()
+            $global:AppInsightsClient.TrackMetric("Install-OpenSSH", $resizeTimer.Elapsed.TotalSeconds)
         }
 
         Write-Log "Apply telemetry data setting"
@@ -206,7 +212,11 @@ try
         $global:AppInsightsClient.TrackMetric("Install-Docker", $dockerTimer.Elapsed.TotalSeconds)
 
         Write-Log "Download kubelet binaries and unzip"
+        $getKubePackageTimer = [System.Diagnostics.Stopwatch]::StartNew()
         Get-KubePackage -KubeBinariesSASURL $global:KubeBinariesPackageSASURL
+        $getKubePackageTimer.Stop()
+        $global:AppInsightsClient.TrackMetric("Get-KubePackage", $dockerTimer.Elapsed.TotalSeconds)
+
 
         # this overwrite the binaries that are download from the custom packge with binaries
         # The custom package has a few files that are nessary for future steps (nssm.exe)
