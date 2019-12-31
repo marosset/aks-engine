@@ -88,7 +88,7 @@ jobs:
     displayName: Copying resource to Classic Storage Account
     condition: eq(variables.COPY_VHD, 'True')
 
-  - script: /
+  - script: |
       OS_DISK_SAS="$(cat packer-output | grep "OSDiskUriReadOnlySas:" | cut -d " " -f 2)" && \
       VHD_NAME="$(echo $OS_DISK_SAS | cut -d "/" -f 8 | cut -d "?" -f 1)" && \
       docker run --rm \
