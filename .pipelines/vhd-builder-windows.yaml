@@ -40,6 +40,7 @@ jobs:
       -e BUILD_NUMBER=$(Build.BuildNumber) \
       ${DEIS_GO_DEV_IMAGE} make run-packer-windows
     displayName: Building windows VHD
+
   - task: PublishPipelineArtifact@1
     inputs:
       artifact: 'vhd-release-notes'
@@ -73,7 +74,6 @@ jobs:
   - script: |
       OS_DISK_SAS="$(cat packer-output | grep "OSDiskUriReadOnlySas:" | cut -d " " -f 2)" && \
       VHD_NAME="$(echo $OS_DISK_SAS | cut -d "/" -f 8 | cut -d "?" -f 1)" && \
-      printf "COPY ME ----> ${CLASSIC_BLOB}/${VHD_NAME}?" | tee -a vhd-sas && \
       docker run --rm \
       -v ${PWD}:/go/src/github.com/Azure/aks-engine \
       -w /go/src/github.com/Azure/aks-engine \
@@ -86,6 +86,28 @@ jobs:
       -e VHD_NAME=${VHD_NAME} \
       ${DEIS_GO_DEV_IMAGE} make az-copy
     displayName: Copying resource to Classic Storage Account
+    condition: eq(variables.COPY_VHD, 'True')
+
+  - script: /
+      OS_DISK_SAS="$(cat packer-output | grep "OSDiskUriReadOnlySas:" | cut -d " " -f 2)" && \
+      VHD_NAME="$(echo $OS_DISK_SAS | cut -d "/" -f 8 | cut -d "?" -f 1)" && \
+      docker run --rm \
+      -v ${PWD}:/go/src/github.com/Azure/aks-engine \
+      -w /go/src/github.com/Azure/aks-engine \
+      -e CLIENT_ID=${CLIENT_ID} \
+      -e CLIENT_SECRET="$(CLIENT_SECRET)" \
+      -e TENANT_ID=${TENANT_ID} \
+      -e CLASSIC_SA_CONNECTION_STRING="$(CLASSIC_SA_CONNECTION_STRING)" \
+      -e STORAGE_ACCT_BLOB_URL=${STORAGE_ACCT_BLOB_URL} \
+      -e VHD_NAME=${VHD_NAME} \
+      ${DEIS_GO_DEV_IMAGE} make windows-vhd-publishing-info
+    displayName: Generating publishing info for Windows VHD
+    condition: eq(variables.COPY_VHD, 'True')
+
+  - task: PublishPipelineArtifact@1
+    inputs:
+      artifact: 'publishing-info'
+      path: 'windows-vhd-publishing-info.json'
     condition: eq(variables.COPY_VHD, 'True')
 
   - script: |
