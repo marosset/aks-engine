@@ -99,7 +99,7 @@ jobs:
       -e SA_NAME=${SA_NAME} \
       -e AZURE_RESOURCE_GROUP_NAME=${AZURE_RESOURCE_GROUP_NAME} \
       ${DEIS_GO_DEV_IMAGE} make delete-sa
-    displayName: cleanup - deleate storage account
+    displayName: cleanup - delete storage account
     condition: always()
 
   - script: |
