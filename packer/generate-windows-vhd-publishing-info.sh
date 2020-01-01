@@ -36,4 +36,4 @@ cat <<EOF > windows-vhd-publishing-info.json
 }
 EOF
 
-cat windows-vhd-publishing-info.json | jq
+cat windows-vhd-publishing-info.json

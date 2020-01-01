@@ -124,7 +124,7 @@ jobs:
     displayName: cleanup - delete storage account
     condition: always()
 
-  - script: |
-      sudo chown -R $USER:$USER .
-    displayName: cleanup - chown all files in work directory 
-    condition: always()
+  # - script: |
+  #     sudo chown -R $USER:$USER .
+  #   displayName: cleanup - chown all files in work directory 
+  #   condition: always()
