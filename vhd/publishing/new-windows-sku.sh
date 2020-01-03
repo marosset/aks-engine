@@ -1,12 +1,11 @@
-#!/bin/bash 
+#!/bin/bash -e
 
 required_env_vars=(
     "SKU_PREFIX"
     "SKU_TEMPLATE_FILE"
-#   "AZURE_TENANT_ID"
-#   "AZURE_CLIENT_ID"
-#   "AZURE_CLIENT_SECRET"
-#    "AZURE_TOKEN"
+    "AZURE_TENANT_ID"
+    "AZURE_CLIENT_ID"
+    "AZURE_CLIENT_SECRET"
     "PUBLISHER"
     "OFFER"
 )
@@ -24,8 +23,8 @@ if [ ! -f "$SKU_TEMPLATE_FILE" ]; then
     exit 1
 fi
 
-short_date=$(date +"%y%m" -d "+1day")
-pretty_date=$(date +"%b %Y" -d "+1day")
+short_date=$(date +"%y%m")
+pretty_date=$(date +"%b %Y")
 
 sku_id="${SKU_PREFIX}-${short_date}"
 
@@ -33,7 +32,7 @@ cat $SKU_TEMPLATE_FILE | sed s/{{ID}}/"$sku_id"/ | sed s/{{MONTH-YEAR}}/"$pretty
 cat sku.json
 
 echo "Creating new SKU"
-# hack/tools/bin/pub skus put -p $PUBLISHER -o "$OFFER" -f sku.json > /dev/null
+# (set -x ;hack/tools/bin/pub skus put -p $PUBLISHER -o "$OFFER" -f sku.json > /dev/null)
 
 echo "Wrting publishing info"
 cat <<EOF > sku-publishing-info.json
