@@ -34,7 +34,7 @@ do
 done
 
 echo "Getting pub..."
-(set -x ; go get -u github.com/devigned/pub@v0.1.0 > /dev/null 2>&1)
+(set -x ; go get -u github.com/devigned/pub@v0.2.0 > /dev/null 2>&1)
 
 echo "Sku publishing info:"
 cat $SKU_INFO
@@ -80,4 +80,4 @@ publisher=$(cat $SKU_INFO | jq -r ".publisher")
 offer=$(cat $SKU_INFO | jq -r ".offer")
 sku=$(cat $SKU_INFO | jq -r ".sku_id")
 
-(set -x ; DEBUG=true pub versions put corevm -p $publisher -o aks-windows -s $sku --version $image_version --vhd-uri $vhd_url --media-name $media_name --label "AKS Base Image for Windows" --desc "AKS Base Image for Windows" --show false)
+(set -x ; pub versions put corevm -p $publisher -o aks-windows -s $sku --version $image_version --vhd-uri $vhd_url --media-name $media_name --label "AKS Base Image for Windows" --desc "AKS Base Image for Windows" --published-date "$published_date")
