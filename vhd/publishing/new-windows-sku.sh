@@ -32,7 +32,7 @@ cat $SKU_TEMPLATE_FILE | sed s/{{ID}}/"$sku_id"/ | sed s/{{MONTH-YEAR}}/"$pretty
 cat sku.json
 
 echo "Creating new SKU"
-# (set -x ;hack/tools/bin/pub skus put -p $PUBLISHER -o "$OFFER" -f sku.json > /dev/null)
+(set -x ; hack/tools/bin/pub skus put -p $PUBLISHER -o "$OFFER" -f sku.json ; echo "")
 
 echo "Wrting publishing info"
 cat <<EOF > sku-publishing-info.json
