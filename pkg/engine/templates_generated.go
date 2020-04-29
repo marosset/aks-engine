@@ -43167,6 +43167,7 @@ function Install-Containerd {
   $clusterConfig = ConvertFrom-Json ((Get-Content $global:KubeClusterConfigPath -ErrorAction Stop) | Out-String)
   $pauseImage = $clusterConfig.Cri.Images.Pause
 
+<#
   @"
 version = 2
 root = "C:\\ProgramData\\containerd\\root"
@@ -43271,6 +43272,82 @@ oom_score = 0
     platforms = ["windows/amd64", "linux/amd64"]
   [plugins."io.containerd.service.v1.diff-service"]
     default = ["windows", "windows-lcow"]
+"@ | Out-File -Encoding ascii $configFile
+#>
+
+@"
+root = "C:\\ProgramData\\containerd\\root"
+state = "C:\\ProgramData\\containerd\\state"
+
+[grpc]
+  address = "\\\\.\\pipe\\containerd-containerd"
+  max_recv_message_size = 16777216
+  max_send_message_size = 16777216
+
+[ttrpc]
+  address = ""
+
+[debug]
+  address = ""
+  level = "debug"
+
+[metrics]
+  address = ""
+  grpc_histogram = false
+
+[cgroup]
+  path = ""
+
+[plugins]
+  [plugins.cri]
+    disable_tcp_service = true
+    stream_idle_timeout = "4h0m0s"
+    stream_server_address = "127.0.0.1"
+    stream_server_port = "0"
+    enable_selinux = false
+    sandbox_image = "upstream.azurecr.io/oss/kubernetes/pause:1.3.0-windows-1809-amd64"
+    stats_collect_period = 10
+    systemd_cgroup = false
+    enable_tls_streaming = false
+    max_container_log_line_size = 16384
+    auto_manage_vhd_template_path = ""
+    [plugins.cri.containerd]
+      snapshotter = "windows"
+      no_pivot = false
+      [plugins.cri.containerd.default_runtime]
+        runtime_type = "io.containerd.runhcs.v1"
+        [plugins.cri.containerd.default_runtime.options]
+          Debug = true
+          DebugType = 2
+          SandboxImage = "upstream.azurecr.io/oss/kubernetes/pause:1.3.0-windows-1809-amd64"
+          SandboxPlatform = "windows/amd64"
+          SandboxIsolation = 1
+      [plugins.cri.containerd.runtimes]
+        [plugins.cri.containerd.runtimes.runhcs-wcow-hypervisor]
+          runtime_type = "io.containerd.runhcs.v1"
+          [plugins.cri.containerd.runtimes.runhcs-wcow-hypervisor.options]
+            Debug = true
+            DebugType = 2
+            SandboxImage = "upstream.azurecr.io/oss/kubernetes/pause:1.3.0-windows-1809-amd64"
+            SandboxPlatform = "windows/amd64"
+            SandboxIsolation = 1
+    [plugins.cri.cni]
+      bin_dir = "$(($CNIBinDir).Replace("\","//"))"
+      conf_dir = "$(($CNIConfDir).Replace("\","//"))"
+      max_conf_num = 1
+      conf_template = ""
+    [plugins.cri.registry]
+      [plugins.cri.registry.mirrors]
+        [plugins.cri.registry.mirrors."docker.io"]
+          endpoint = ["https://registry-1.docker.io"]
+  [plugins.diff-service]
+    default = ["windows", "windows-lcow"]
+  [plugins.scheduler]
+    pause_threshold = 0.02
+    deletion_threshold = 0
+    mutation_threshold = 100
+    schedule_delay = "0s"
+    startup_delay = "100ms"
 "@ | Out-File -Encoding ascii $configFile
 
   RegisterContainerDService
