@@ -23437,6 +23437,13 @@ function Write-KubeClusterConfig {
 
     $Global:ClusterConfiguration = [PSCustomObject]@{ }
 
+    $hypervRuntimeHandlers = $global:HypervRuntimeHandlers.split(",", [System.StringSplitOptions]::RemoveEmptyEntries)
+    $nodeLabels = $global:KubeletNodeLabels
+    foreach ($handlerName in $hypervRuntimeHandlers) {
+        $nodeLabels += ",windows/runtime-hyperv-${handlerName}=true"
+    }
+
+
     $Global:ClusterConfiguration | Add-Member -MemberType NoteProperty -Name Cri -Value @{
         Name   = $global:ContainerRuntime;
         Images = @{
@@ -23471,7 +23478,7 @@ function Write-KubeClusterConfig {
             DnsIp       = $KubeDnsServiceIp
         };
         Kubelet      = @{
-            NodeLabels = $global:KubeletNodeLabels;
+            NodeLabels = $nodeLabels;
             ConfigArgs = $global:KubeletConfigArgs
         };
     }
